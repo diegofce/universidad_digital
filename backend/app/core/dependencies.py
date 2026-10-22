@@ -8,7 +8,7 @@ import jwt
 from app.core.config import settings
 from app.core.database import get_db
 from app.users.models import Permission, Role, RolePermission, User, UserRole
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, Header, HTTPException, Request, status
 from jwt import InvalidTokenError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -85,18 +85,20 @@ def require_permissions(*permissions: str) -> Callable[..., User]:
     return check
 
 
-def csrf_protection(request: Request) -> None:
+def csrf_protection(
+    request: Request,
+    csrf_token: str | None = Header(default=None, alias="X-CSRF-Token"),
+) -> None:
     """Validate the double-submit CSRF token for state-changing requests."""
     if request.method in {"GET", "HEAD", "OPTIONS"} or request.url.path.endswith(
         "/auth/login"
     ):
         return
     cookie_token = request.cookies.get("csrf_token")
-    header_token = request.headers.get("X-CSRF-Token")
     if (
         not cookie_token
-        or not header_token
-        or not secrets.compare_digest(cookie_token, header_token)
+        or not csrf_token
+        or not secrets.compare_digest(cookie_token, csrf_token)
     ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="CSRF validation failed"
