@@ -1,0 +1,48 @@
+# Variables de entorno y secretos
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Herramientas
+.vscode/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Bases locales y artefactos de desarrollo
+*.db
+*.sqlite
+*.sqlite3
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Builds y logs
+dist/
+build/
+*.log
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+
+# Pruebas y cachés
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Entorno virtual
+.venv/
+venv/
+
