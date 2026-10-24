@@ -66,6 +66,18 @@ def enrollments(db: Db, actor: Actor) -> list[EnrollmentResponse]:
     )
 
 
+@router.get("/enrollments/{item_id}", response_model=EnrollmentResponse)
+def get_enrollment(item_id: int, db: Db, actor: Actor) -> EnrollmentResponse:
+    """Return an enrollment only to its owner, assigned teacher, or administrator."""
+    roles = {role.role_name for role in actor.roles}
+    item = services.get_enrollment(db, item_id)
+    owns_enrollment = item.student_id == actor.id
+    teaches_subject = "teacher" in roles and item.subject.teacher_id == actor.id
+    if "administrator" not in roles and not owns_enrollment and not teaches_subject:
+        raise AppError("Enrollment not found", 404)
+    return item
+
+
 @router.put("/enrollments/{item_id}", response_model=EnrollmentResponse)
 def update_enrollment(
     item_id: int, data: EnrollmentUpdate, db: Db, actor: Actor

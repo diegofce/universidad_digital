@@ -10,10 +10,20 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 
-def create_grade(db: Session, data: GradeCreate) -> Grade:
-    """Create a grade for a valid enrollment."""
-    if db.get(Enrollment, data.enrollment_id) is None:
+def create_grade(
+    db: Session,
+    data: GradeCreate,
+    teacher_id: int | None = None,
+    admin: bool = False,
+) -> Grade:
+    """Create a grade within the administrator or assigned teacher scope."""
+    enrollment = db.get(Enrollment, data.enrollment_id)
+    if enrollment is None:
         raise AppError("Enrollment not found", 404)
+    if not admin and (
+        teacher_id is None or enrollment.subject.teacher_id != teacher_id
+    ):
+        raise AppError("Teacher is not assigned to this subject", 403)
     item = Grade(**data.model_dump())
     db.add(item)
     try:
@@ -86,9 +96,15 @@ def calculate_weighted_average(
     return db.scalar(query)
 
 
-def update_grade(db: Session, item_id: int, data: GradeUpdate) -> Grade:
+def update_grade(
+    db: Session,
+    item_id: int,
+    data: GradeUpdate,
+    teacher_id: int | None = None,
+    admin: bool = False,
+) -> Grade:
     """Update grade fields."""
-    item = get_grade(db, item_id)
+    item = get_grade(db, item_id, teacher_id=teacher_id, admin=admin)
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(item, key, value)
     try:
