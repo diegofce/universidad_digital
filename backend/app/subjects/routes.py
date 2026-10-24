@@ -3,7 +3,12 @@
 from typing import Annotated
 
 from app.core.database import get_db
-from app.core.dependencies import csrf_protection, current_user, require_permissions
+from app.core.dependencies import (
+    active_role_names,
+    csrf_protection,
+    current_user,
+    require_permissions,
+)
 from app.subjects import services
 from app.subjects.schemas import SubjectCreate, SubjectResponse, SubjectUpdate
 from app.users.models import User
@@ -26,7 +31,7 @@ def create(data: SubjectCreate, db: Db, _: Admin) -> SubjectResponse:
 @router.get("/", response_model=list[SubjectResponse])
 def list_all(db: Db, _: Reader) -> list[SubjectResponse]:
     reader = _
-    role_names = {role.role_name for role in reader.roles}
+    role_names = active_role_names(reader)
     teacher_id = reader.id if "teacher" in role_names else None
     return services.list_subjects(db, teacher_id, "administrator" in role_names)
 
@@ -34,7 +39,7 @@ def list_all(db: Db, _: Reader) -> list[SubjectResponse]:
 @router.get("/{item_id}", response_model=SubjectResponse)
 def get_one(item_id: int, db: Db, _: Reader) -> SubjectResponse:
     reader = _
-    role_names = {role.role_name for role in reader.roles}
+    role_names = active_role_names(reader)
     teacher_id = reader.id if "teacher" in role_names else None
     return services.get_subject(db, item_id, teacher_id, "administrator" in role_names)
 

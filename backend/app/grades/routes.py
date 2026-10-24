@@ -3,7 +3,12 @@
 from typing import Annotated
 
 from app.core.database import get_db
-from app.core.dependencies import csrf_protection, current_user, require_permissions
+from app.core.dependencies import (
+    active_role_names,
+    csrf_protection,
+    current_user,
+    require_permissions,
+)
 from app.core.errors import AppError
 from app.grades import services
 from app.grades.schemas import (
@@ -26,7 +31,7 @@ Staff = Annotated[User, Depends(require_permissions("grades.manage"))]
 
 @router.post("/", response_model=GradeResponse, status_code=201)
 def create(data: GradeCreate, db: Db, actor: Staff) -> GradeResponse:
-    roles = {role.role_name for role in actor.roles}
+    roles = active_role_names(actor)
     if not roles.intersection({"administrator", "teacher"}):
         raise AppError("Insufficient permissions", 403)
     return services.create_grade(
@@ -39,7 +44,7 @@ def create(data: GradeCreate, db: Db, actor: Staff) -> GradeResponse:
 
 @router.get("/", response_model=list[GradeResponse])
 def list_all(db: Db, actor: Actor) -> list[GradeResponse]:
-    roles = {role.role_name for role in actor.roles}
+    roles = active_role_names(actor)
     if "administrator" in roles:
         return services.list_grades(db)
     if "teacher" in roles:
@@ -55,7 +60,7 @@ def summary(
     period_id: int | None = Query(default=None, gt=0),
 ) -> GradeSummaryResponse:
     """Return a credit-weighted average within the caller's scope."""
-    roles = {role.role_name for role in actor.roles}
+    roles = active_role_names(actor)
     if "student" in roles and student_id != actor.id:
         raise AppError("Grade summary not found", 404)
     teacher_id = (
@@ -69,7 +74,7 @@ def summary(
 
 @router.get("/{item_id}", response_model=GradeResponse)
 def get_one(item_id: int, db: Db, actor: Actor) -> GradeResponse:
-    roles = {role.role_name for role in actor.roles}
+    roles = active_role_names(actor)
     return services.get_grade(
         db,
         item_id,

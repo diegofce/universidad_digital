@@ -78,7 +78,7 @@ def update_subject(db: Session, item_id: int, data: SubjectUpdate) -> Subject:
     """Update provided subject fields."""
     values = data.model_dump(exclude_unset=True)
     _validate_teacher(db, values.get("teacher_id"))
-    item = get_subject(db, item_id)
+    item = get_subject(db, item_id, include_inactive=True)
     for field, value in values.items():
         setattr(item, field, value)
     try:
