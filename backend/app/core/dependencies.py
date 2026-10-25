@@ -16,6 +16,11 @@ from sqlalchemy.orm import Session
 DbSession = Annotated[Session, Depends(get_db)]
 
 
+def active_role_names(user: User) -> set[str]:
+    """Return only role names from active role definitions."""
+    return {user_role.role_name for user_role in user.roles if user_role.role.is_active}
+
+
 def current_user(request: Request, db: DbSession) -> User:
     """Resolve an active user from the HttpOnly access-token cookie."""
     token = request.cookies.get("access_token")
@@ -70,8 +75,10 @@ def require_permissions(*permissions: str) -> Callable[..., User]:
                 select(Permission.name)
                 .join(RolePermission, RolePermission.permission_id == Permission.id)
                 .join(UserRole, UserRole.role_id == RolePermission.role_id)
+                .join(Role, Role.id == RolePermission.role_id)
                 .where(
                     UserRole.user_id == user.id,
+                    Role.is_active.is_(True),
                     Permission.is_active.is_(True),
                 )
             )

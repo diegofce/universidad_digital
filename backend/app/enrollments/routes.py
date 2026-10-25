@@ -3,7 +3,12 @@
 from typing import Annotated
 
 from app.core.database import get_db
-from app.core.dependencies import csrf_protection, current_user, require_permissions
+from app.core.dependencies import (
+    active_role_names,
+    csrf_protection,
+    current_user,
+    require_permissions,
+)
 from app.core.errors import AppError
 from app.enrollments import services
 from app.enrollments.schemas import (
@@ -47,7 +52,7 @@ def delete_period(item_id: int, db: Db, _: Admin) -> Response:
 
 @router.post("/enrollments/", response_model=EnrollmentResponse, status_code=201)
 def enroll(data: EnrollmentCreate, db: Db, actor: Actor) -> EnrollmentResponse:
-    roles = {role.role_name for role in actor.roles}
+    roles = active_role_names(actor)
     if not roles.intersection({"student", "administrator"}):
         raise AppError("Insufficient permissions", 403)
     return services.create_enrollment(
@@ -57,7 +62,7 @@ def enroll(data: EnrollmentCreate, db: Db, actor: Actor) -> EnrollmentResponse:
 
 @router.get("/enrollments/", response_model=list[EnrollmentResponse])
 def enrollments(db: Db, actor: Actor) -> list[EnrollmentResponse]:
-    roles = {role.role_name for role in actor.roles}
+    roles = active_role_names(actor)
     return services.list_enrollments(
         db,
         actor.id,
@@ -69,7 +74,7 @@ def enrollments(db: Db, actor: Actor) -> list[EnrollmentResponse]:
 @router.get("/enrollments/{item_id}", response_model=EnrollmentResponse)
 def get_enrollment(item_id: int, db: Db, actor: Actor) -> EnrollmentResponse:
     """Return an enrollment only to its owner, assigned teacher, or administrator."""
-    roles = {role.role_name for role in actor.roles}
+    roles = active_role_names(actor)
     item = services.get_enrollment(db, item_id)
     owns_enrollment = item.student_id == actor.id
     teaches_subject = "teacher" in roles and item.subject.teacher_id == actor.id
@@ -82,7 +87,7 @@ def get_enrollment(item_id: int, db: Db, actor: Actor) -> EnrollmentResponse:
 def update_enrollment(
     item_id: int, data: EnrollmentUpdate, db: Db, actor: Actor
 ) -> EnrollmentResponse:
-    roles = {role.role_name for role in actor.roles}
+    roles = active_role_names(actor)
     if not roles.intersection({"administrator", "teacher"}):
         raise AppError("Insufficient permissions", 403)
     return services.update_enrollment(
@@ -97,7 +102,7 @@ def update_enrollment(
 
 @router.delete("/enrollments/{item_id}", status_code=204)
 def unenroll(item_id: int, db: Db, actor: Actor) -> Response:
-    roles = {role.role_name for role in actor.roles}
+    roles = active_role_names(actor)
     services.delete_enrollment(
         db,
         item_id,
