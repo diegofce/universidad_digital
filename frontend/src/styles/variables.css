@@ -1,0 +1,15 @@
+:root {
+  font-family: 'Aptos', 'Segoe UI', sans-serif;
+  color: #172b4d;
+  background: #f5f7fa;
+  font-synthesis: none;
+  --navy: #102a43;
+  --blue: #1769aa;
+  --teal: #008c95;
+  --gold: #e6a23c;
+  --ink: #172b4d;
+  --muted: #627d98;
+  --line: #d9e2ec;
+  --surface: #fff;
+  --danger: #b42318;
+}
