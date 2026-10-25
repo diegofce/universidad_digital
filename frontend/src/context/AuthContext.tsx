@@ -1,11 +1,9 @@
 import axios from 'axios';
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import type { User } from '../api/types';
-import type { AuthContextValue } from '../auth/auth.types';
 import { hasPermission, hasRole } from '../auth/auth.utils';
 import { authService } from '../services/auth.service';
-
-const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+import { AuthContext } from './auth-context';
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setLoading] = useState(true);
@@ -60,9 +58,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
-}
-export function useAuthContext(): AuthContextValue {
-  const value = useContext(AuthContext);
-  if (!value) throw new Error('useAuthContext must be used inside AuthProvider');
-  return value;
 }

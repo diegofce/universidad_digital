@@ -45,6 +45,6 @@ Los formularios tienen labels y errores asociados, las tablas usan encabezados, 
 
 ## Validación y pendientes
 
-Se validaron `typecheck`, `build` y `lint`; Vitest cubre CSRF y errores. Las validaciones de login real, permisos, CSRF inválido, conflictos, sesión expirada y flujos de datos requieren backend iniciado y usuarios/datos de prueba. La interfaz inicial ya consulta recursos reales y permite desactivar usuarios; la creación y edición detallada de cada recurso debe añadirse con formularios específicos si el proyecto necesita un CRUD administrativo completo.
+Se validaron `typecheck`, `build` y `lint`; Vitest cubre CSRF y errores. Las validaciones de login real, permisos, CSRF inválido, conflictos, sesión expirada y flujos de datos requieren backend iniciado y usuarios/datos de prueba. La interfaz consulta recursos reales e incluye formularios y mutaciones para usuarios, materias, periodos, inscripciones y calificaciones. Roles y permisos tienen servicios y guards integrados, pero sus formularios administrativos específicos todavía requieren una iteración adicional.
 
 Para producción se recomienda HTTPS, cookies Secure, CORS explícito al origen desplegado, secretos fuera del repositorio, CSP y pruebas E2E contra datos controlados. `npm install` reportó 3 vulnerabilidades transitorias; deben revisarse con el equipo antes de aplicar actualizaciones mayores.
