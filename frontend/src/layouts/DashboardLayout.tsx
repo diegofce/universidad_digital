@@ -62,8 +62,8 @@ export function DashboardLayout() {
             <Menu />
           </button>
           <span>
-            <strong>{user?.full_name}</strong>
-            <span className="muted"> · {user?.roles.join(', ')}</span>
+            <strong>Bienvenido: {user?.first_name ?? user?.full_name}</strong>
+            <span className="muted"> · Cargo: {user?.roles.join(', ')}</span>
           </span>
           <button className="button secondary" onClick={() => void logout()}>
             <LogOut size={16} aria-hidden="true" /> Salir

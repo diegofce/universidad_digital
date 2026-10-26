@@ -1,6 +1,7 @@
 """Validated user request and response schemas."""
 
-from datetime import datetime
+from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
@@ -12,6 +13,20 @@ class UserCreate(BaseModel):
     full_name: str = Field(min_length=1, max_length=160)
     password: str = Field(min_length=12, max_length=128)
     roles: list[str] = Field(default_factory=list)
+    first_name: str = Field(min_length=1, max_length=80)
+    last_name: str = Field(min_length=1, max_length=120)
+    identification_number: str = Field(
+        min_length=5, max_length=40, pattern=r"^[A-Za-z0-9-]+$"
+    )
+    birth_date: date
+    phone: str = Field(min_length=7, max_length=25, pattern=r"^\+?[0-9 ()-]+$")
+
+    @field_validator("birth_date")
+    @classmethod
+    def validate_birth_date(cls, value: date) -> date:
+        if value > date.today():
+            raise ValueError("birth_date cannot be in the future")
+        return value
 
 
 class UserUpdate(BaseModel):
@@ -22,6 +37,37 @@ class UserUpdate(BaseModel):
     password: str | None = Field(default=None, min_length=12, max_length=128)
     is_active: bool | None = None
     roles: list[str] | None = None
+    first_name: str | None = Field(default=None, min_length=1, max_length=80)
+    last_name: str | None = Field(default=None, min_length=1, max_length=120)
+    identification_number: str | None = Field(
+        default=None, min_length=5, max_length=40, pattern=r"^[A-Za-z0-9-]+$"
+    )
+    birth_date: date | None = None
+    phone: str | None = Field(
+        default=None, min_length=7, max_length=25, pattern=r"^\+?[0-9 ()-]+$"
+    )
+
+    @field_validator("birth_date")
+    @classmethod
+    def validate_birth_date(cls, value: date | None) -> date | None:
+        if value is not None and value > date.today():
+            raise ValueError("birth_date cannot be in the future")
+        return value
+
+    @field_validator(
+        "first_name",
+        "last_name",
+        "identification_number",
+        "birth_date",
+        "phone",
+        mode="before",
+    )
+    @classmethod
+    def reject_null_profile_fields(cls, value: object) -> object:
+        """Reject explicit null while keeping partial omission valid."""
+        if value is None:
+            raise ValueError("profile fields cannot be null")
+        return value
 
 
 class UserResponse(BaseModel):
@@ -34,6 +80,12 @@ class UserResponse(BaseModel):
     is_active: bool
     created_at: datetime
     roles: list[str] = Field(default_factory=list)
+    permissions: list[str] = Field(default_factory=list)
+    first_name: str | None = None
+    last_name: str | None = None
+    identification_number: str | None = None
+    birth_date: date | None = None
+    phone: str | None = None
 
     @field_validator("roles", mode="before")
     @classmethod
@@ -42,6 +94,15 @@ class UserResponse(BaseModel):
         if value is None:
             return []
         return [getattr(role, "role_name", role) for role in value]
+
+
+class UserLookupResponse(BaseModel):
+    """Minimal non-sensitive user data for academic selectors."""
+
+    id: int
+    display_name: str
+    email: EmailStr
+    role: Literal["teacher", "student"]
 
 
 class LoginRequest(BaseModel):
@@ -76,6 +137,20 @@ class RoleResponse(BaseModel):
     name: str
     description: str
     is_active: bool
+    permissions: list[str] = Field(default_factory=list)
+
+    @field_validator("permissions", mode="before")
+    @classmethod
+    def serialize_permissions(cls, value: object) -> list[str]:
+        """Serialize role-permission associations as permission names."""
+        if value is None:
+            return []
+        return [
+            permission.name
+            if hasattr(permission, "name")
+            else getattr(permission.permission, "name", str(permission))
+            for permission in value
+        ]
 
 
 class PermissionCreate(BaseModel):

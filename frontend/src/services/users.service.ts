@@ -1,9 +1,23 @@
 import { api } from '../api/client';
 import { endpoints } from '../api/endpoints';
-import type { Permission, Role, User, UserCreate, UserUpdate } from '../api/types';
+import type { Permission, Role, User, UserCreate, UserLookup, UserUpdate } from '../api/types';
 export const usersService = {
   list: (offset = 0, limit = 100) =>
     api.get<User[]>(endpoints.users, { params: { offset, limit } }).then((r) => r.data),
+  listAll: async (limit = 100) => {
+    const users: User[] = [];
+    let offset = 0;
+    while (true) {
+      const page = await usersService.list(offset, limit);
+      users.push(...page);
+      if (page.length < limit) return users;
+      offset += limit;
+    }
+  },
+  lookup: (role: 'teacher' | 'student', search: string, limit = 10) =>
+    api
+      .get<UserLookup[]>(`${endpoints.users}lookup`, { params: { role, search, limit } })
+      .then((r) => r.data),
   get: (id: number) => api.get<User>(`${endpoints.users}${id}`).then((r) => r.data),
   create: (data: UserCreate) => api.post<User>(endpoints.users, data).then((r) => r.data),
   update: (id: number, data: UserUpdate) =>

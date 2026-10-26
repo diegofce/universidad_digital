@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import type {
   Enrollment,
   EnrollmentCreate,
@@ -13,8 +13,10 @@ import type {
   SubjectUpdate,
   User,
   UserCreate,
+  UserLookup,
   UserUpdate,
 } from '../../api/types';
+import { usersService } from '../../services/users.service';
 import { Button } from '../ui/Button';
 import { Field } from './Field';
 
@@ -22,20 +24,29 @@ function FormCard({
   title,
   children,
   onSubmit,
+  onCancel,
   busy,
 }: {
   title: string;
   children: ReactNode;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   busy: boolean;
+  onCancel?: () => void;
 }) {
   return (
-    <form className="panel form-grid" onSubmit={onSubmit} noValidate>
+    <form className="panel form-grid" onSubmit={onSubmit}>
       <h2>{title}</h2>
       {children}
-      <Button type="submit" disabled={busy}>
-        {busy ? 'Guardando...' : 'Guardar'}
-      </Button>
+      <div className="form-actions">
+        <Button type="submit" disabled={busy}>
+          {busy ? 'Guardando...' : 'Guardar'}
+        </Button>
+        {onCancel && (
+          <Button type="button" className="secondary" onClick={onCancel} disabled={busy}>
+            Cancelar
+          </Button>
+        )}
+      </div>
     </form>
   );
 }
@@ -52,6 +63,11 @@ export function UserCreateForm({
     full_name: '',
     password: '',
     roles: ['student'],
+    first_name: '',
+    last_name: '',
+    identification_number: '',
+    birth_date: '',
+    phone: '',
   });
   return (
     <FormCard
@@ -74,6 +90,38 @@ export function UserCreateForm({
         required
         value={data.full_name}
         onChange={(e) => setData({ ...data, full_name: e.target.value })}
+      />
+      <Field
+        label="Nombres"
+        required
+        value={data.first_name}
+        onChange={(e) => setData({ ...data, first_name: e.target.value })}
+      />
+      <Field
+        label="Apellidos"
+        required
+        value={data.last_name}
+        onChange={(e) => setData({ ...data, last_name: e.target.value })}
+      />
+      <Field
+        label="Cédula"
+        required
+        value={data.identification_number}
+        onChange={(e) => setData({ ...data, identification_number: e.target.value })}
+      />
+      <Field
+        label="Fecha de nacimiento"
+        type="date"
+        required
+        value={data.birth_date}
+        onChange={(e) => setData({ ...data, birth_date: e.target.value })}
+      />
+      <Field
+        label="Teléfono"
+        type="tel"
+        required
+        value={data.phone}
+        onChange={(e) => setData({ ...data, phone: e.target.value })}
       />
       <Field
         label="Contraseña"
@@ -102,11 +150,22 @@ export function UserCreateForm({
 export function SubjectCreateForm({
   onSubmit,
   busy,
+  teachers,
 }: {
   onSubmit: (data: SubjectCreate) => Promise<void>;
   busy: boolean;
+  teachers?: UserLookup[];
 }) {
   const [data, setData] = useState<SubjectCreate>({ code: '', name: '', credits: 3 });
+  const [teacherSearch, setTeacherSearch] = useState('');
+  const [teacherOptions, setTeacherOptions] = useState<UserLookup[]>(teachers ?? []);
+  useEffect(() => {
+    if (teacherSearch.trim().length < 2) return;
+    const timer = window.setTimeout(() => {
+      void usersService.lookup('teacher', teacherSearch.trim()).then(setTeacherOptions);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [teacherSearch]);
   return (
     <FormCard
       title="Crear materia"
@@ -142,15 +201,31 @@ export function SubjectCreateForm({
         value={data.credits}
         onChange={(e) => setData({ ...data, credits: Number(e.target.value) })}
       />
-      <Field
-        label="ID del docente (opcional)"
-        type="number"
-        min={1}
-        value={data.teacher_id ?? ''}
-        onChange={(e) =>
-          setData({ ...data, teacher_id: e.target.value ? Number(e.target.value) : undefined })
-        }
-      />
+      <div className="field">
+        <label htmlFor="subject-teacher-search">Buscar docente</label>
+        <input
+          id="subject-teacher-search"
+          value={teacherSearch}
+          onChange={(e) => setTeacherSearch(e.target.value)}
+          placeholder="Nombre o correo"
+        />
+        <label htmlFor="subject-teacher">Docente</label>
+        <select
+          id="subject-teacher"
+          required
+          value={data.teacher_id ?? ''}
+          onChange={(e) => setData({ ...data, teacher_id: Number(e.target.value) })}
+        >
+          <option value="" disabled>
+            Selecciona un docente
+          </option>
+          {teacherOptions.map((teacher) => (
+            <option value={teacher.id} key={teacher.id}>
+              {teacher.display_name} ({teacher.email})
+            </option>
+          ))}
+        </select>
+      </div>
     </FormCard>
   );
 }
@@ -199,15 +274,30 @@ export function PeriodCreateForm({
 export function EnrollmentCreateForm({
   onSubmit,
   busy,
+  students,
+  subjects,
+  periods,
 }: {
   onSubmit: (data: EnrollmentCreate) => Promise<void>;
   busy: boolean;
+  students?: UserLookup[];
+  subjects: Subject[];
+  periods: Period[];
 }) {
   const [data, setData] = useState<EnrollmentCreate>({
     student_id: 0,
     subject_id: 0,
     period_id: 0,
   });
+  const [studentSearch, setStudentSearch] = useState('');
+  const [studentOptions, setStudentOptions] = useState<UserLookup[]>(students ?? []);
+  useEffect(() => {
+    if (studentSearch.trim().length < 2) return;
+    const timer = window.setTimeout(() => {
+      void usersService.lookup('student', studentSearch.trim()).then(setStudentOptions);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [studentSearch]);
   return (
     <FormCard
       title="Crear inscripción"
@@ -217,30 +307,69 @@ export function EnrollmentCreateForm({
         void onSubmit(data);
       }}
     >
-      <Field
-        label="ID del estudiante"
-        type="number"
-        min={1}
-        required
-        value={data.student_id || ''}
-        onChange={(e) => setData({ ...data, student_id: Number(e.target.value) })}
-      />
-      <Field
-        label="ID de la materia"
-        type="number"
-        min={1}
-        required
-        value={data.subject_id || ''}
-        onChange={(e) => setData({ ...data, subject_id: Number(e.target.value) })}
-      />
-      <Field
-        label="ID del periodo"
-        type="number"
-        min={1}
-        required
-        value={data.period_id || ''}
-        onChange={(e) => setData({ ...data, period_id: Number(e.target.value) })}
-      />
+      <div className="field">
+        <label htmlFor="enrollment-student-search">Buscar estudiante</label>
+        <input
+          id="enrollment-student-search"
+          value={studentSearch}
+          onChange={(e) => setStudentSearch(e.target.value)}
+          placeholder="Nombre o correo"
+        />
+        <label htmlFor="enrollment-student">Estudiante</label>
+        <select
+          id="enrollment-student"
+          required
+          value={data.student_id || ''}
+          onChange={(e) => setData({ ...data, student_id: Number(e.target.value) })}
+        >
+          <option value="" disabled>
+            Selecciona un estudiante
+          </option>
+          {studentOptions.map((student) => (
+            <option value={student.id} key={student.id}>
+              {student.display_name} ({student.email})
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="field">
+        <label htmlFor="enrollment-subject">Materia</label>
+        <select
+          id="enrollment-subject"
+          required
+          value={data.subject_id || ''}
+          onChange={(e) => setData({ ...data, subject_id: Number(e.target.value) })}
+        >
+          <option value="" disabled>
+            Selecciona una materia
+          </option>
+          {subjects
+            .filter((subject) => subject.is_active)
+            .map((subject) => (
+              <option value={subject.id} key={subject.id}>
+                {subject.code} - {subject.name}
+              </option>
+            ))}
+        </select>
+      </div>
+      <div className="field">
+        <label htmlFor="enrollment-period">Periodo</label>
+        <select
+          id="enrollment-period"
+          required
+          value={data.period_id || ''}
+          onChange={(e) => setData({ ...data, period_id: Number(e.target.value) })}
+        >
+          <option value="" disabled>
+            Selecciona un periodo
+          </option>
+          {periods.map((period) => (
+            <option value={period.id} key={period.id}>
+              {period.name}
+            </option>
+          ))}
+        </select>
+      </div>
     </FormCard>
   );
 }
@@ -248,11 +377,24 @@ export function EnrollmentCreateForm({
 export function GradeCreateForm({
   onSubmit,
   busy,
+  enrollments,
+  students,
 }: {
   onSubmit: (data: GradeCreate) => Promise<void>;
   busy: boolean;
+  enrollments: Enrollment[];
+  students?: UserLookup[];
 }) {
   const [data, setData] = useState<GradeCreate>({ enrollment_id: 0, score: 0, assessment: '' });
+  const [studentSearch, setStudentSearch] = useState('');
+  const [studentOptions, setStudentOptions] = useState<UserLookup[]>(students ?? []);
+  useEffect(() => {
+    if (studentSearch.trim().length < 2) return;
+    const timer = window.setTimeout(() => {
+      void usersService.lookup('student', studentSearch.trim()).then(setStudentOptions);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [studentSearch]);
   return (
     <FormCard
       title="Registrar calificación"
@@ -262,14 +404,39 @@ export function GradeCreateForm({
         void onSubmit(data);
       }}
     >
-      <Field
-        label="ID de inscripción"
-        type="number"
-        min={1}
-        required
-        value={data.enrollment_id || ''}
-        onChange={(e) => setData({ ...data, enrollment_id: Number(e.target.value) })}
-      />
+      <div className="field">
+        <label htmlFor="grade-student-search">Buscar estudiante</label>
+        <input
+          id="grade-student-search"
+          value={studentSearch}
+          onChange={(e) => setStudentSearch(e.target.value)}
+          placeholder="Nombre o correo"
+        />
+        <label htmlFor="grade-enrollment">Estudiante e inscripción</label>
+        <select
+          id="grade-enrollment"
+          required
+          value={data.enrollment_id || ''}
+          onChange={(e) => setData({ ...data, enrollment_id: Number(e.target.value) })}
+        >
+          <option value="" disabled>
+            Selecciona un estudiante
+          </option>
+          {enrollments
+            .filter((enrollment) =>
+              studentOptions.some((student) => student.id === enrollment.student_id),
+            )
+            .map((enrollment) => {
+              const student = studentOptions.find((item) => item.id === enrollment.student_id);
+              return (
+                <option value={enrollment.id} key={enrollment.id}>
+                  #{enrollment.id} -{' '}
+                  {student?.display_name ?? `Estudiante ${enrollment.student_id}`}
+                </option>
+              );
+            })}
+        </select>
+      </div>
       <Field
         label="Puntaje (0 a 5)"
         type="number"
@@ -294,20 +461,28 @@ export function UserEditForm({
   initial,
   onSubmit,
   busy,
+  onCancel,
 }: {
   initial: User;
   onSubmit: (data: UserUpdate) => Promise<void>;
   busy: boolean;
+  onCancel?: () => void;
 }) {
   const [data, setData] = useState<UserUpdate>({
     full_name: initial.full_name,
     is_active: initial.is_active,
     roles: initial.roles,
+    first_name: initial.first_name ?? '',
+    last_name: initial.last_name ?? '',
+    identification_number: initial.identification_number ?? '',
+    birth_date: initial.birth_date ?? '',
+    phone: initial.phone ?? '',
   });
   return (
     <FormCard
       title={`Editar usuario: ${initial.email}`}
       busy={busy}
+      onCancel={onCancel}
       onSubmit={(event) => {
         event.preventDefault();
         void onSubmit(data);
@@ -318,6 +493,38 @@ export function UserEditForm({
         required
         value={data.full_name ?? ''}
         onChange={(e) => setData({ ...data, full_name: e.target.value })}
+      />
+      <Field
+        label="Nombres"
+        required
+        value={data.first_name ?? ''}
+        onChange={(e) => setData({ ...data, first_name: e.target.value })}
+      />
+      <Field
+        label="Apellidos"
+        required
+        value={data.last_name ?? ''}
+        onChange={(e) => setData({ ...data, last_name: e.target.value })}
+      />
+      <Field
+        label="Cédula"
+        required
+        value={data.identification_number ?? ''}
+        onChange={(e) => setData({ ...data, identification_number: e.target.value })}
+      />
+      <Field
+        label="Fecha de nacimiento"
+        type="date"
+        required
+        value={data.birth_date ?? ''}
+        onChange={(e) => setData({ ...data, birth_date: e.target.value })}
+      />
+      <Field
+        label="Teléfono"
+        type="tel"
+        required
+        value={data.phone ?? ''}
+        onChange={(e) => setData({ ...data, phone: e.target.value })}
       />
       <Field
         label="Nueva contraseña (opcional)"
@@ -345,10 +552,12 @@ export function SubjectEditForm({
   initial,
   onSubmit,
   busy,
+  onCancel,
 }: {
   initial: Subject;
   onSubmit: (data: SubjectUpdate) => Promise<void>;
   busy: boolean;
+  onCancel?: () => void;
 }) {
   const [data, setData] = useState<SubjectUpdate>({
     code: initial.code,
@@ -356,12 +565,13 @@ export function SubjectEditForm({
     description: initial.description ?? '',
     credits: initial.credits,
     is_active: initial.is_active,
-    teacher_id: initial.teacher_id ?? undefined,
+    teacher_id: initial.teacher_id ?? null,
   });
   return (
     <FormCard
       title={`Editar materia: ${initial.code}`}
       busy={busy}
+      onCancel={onCancel}
       onSubmit={(event) => {
         event.preventDefault();
         void onSubmit(data);
@@ -399,7 +609,7 @@ export function SubjectEditForm({
         min={1}
         value={data.teacher_id ?? ''}
         onChange={(e) =>
-          setData({ ...data, teacher_id: e.target.value ? Number(e.target.value) : undefined })
+          setData({ ...data, teacher_id: e.target.value ? Number(e.target.value) : null })
         }
       />
       <div className="field">
@@ -421,10 +631,12 @@ export function PeriodEditForm({
   initial,
   onSubmit,
   busy,
+  onCancel,
 }: {
   initial: Period;
   onSubmit: (data: PeriodUpdate) => Promise<void>;
   busy: boolean;
+  onCancel?: () => void;
 }) {
   const [data, setData] = useState<PeriodUpdate>({
     name: initial.name,
@@ -435,6 +647,7 @@ export function PeriodEditForm({
     <FormCard
       title={`Editar periodo: ${initial.name}`}
       busy={busy}
+      onCancel={onCancel}
       onSubmit={(event) => {
         event.preventDefault();
         void onSubmit(data);
@@ -468,16 +681,19 @@ export function EnrollmentEditForm({
   initial,
   onSubmit,
   busy,
+  onCancel,
 }: {
   initial: Enrollment;
   onSubmit: (status: Enrollment['status']) => Promise<void>;
   busy: boolean;
+  onCancel?: () => void;
 }) {
   const [status, setStatus] = useState<Enrollment['status']>(initial.status);
   return (
     <FormCard
       title={`Editar inscripción #${initial.id}`}
       busy={busy}
+      onCancel={onCancel}
       onSubmit={(event) => {
         event.preventDefault();
         void onSubmit(status);
@@ -503,10 +719,12 @@ export function GradeEditForm({
   initial,
   onSubmit,
   busy,
+  onCancel,
 }: {
   initial: Grade;
   onSubmit: (data: GradeUpdate) => Promise<void>;
   busy: boolean;
+  onCancel?: () => void;
 }) {
   const [data, setData] = useState<GradeUpdate>({
     score: initial.score,
@@ -516,6 +734,7 @@ export function GradeEditForm({
     <FormCard
       title={`Editar calificación #${initial.id}`}
       busy={busy}
+      onCancel={onCancel}
       onSubmit={(event) => {
         event.preventDefault();
         void onSubmit(data);

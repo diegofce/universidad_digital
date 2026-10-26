@@ -35,6 +35,7 @@ def create_tables() -> None:
         RoleAudit,
         RolePermission,
         User,
+        UserProfile,
         UserRole,
     )
 

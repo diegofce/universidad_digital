@@ -32,6 +32,7 @@ frontend/.vite/
 dist/
 build/
 *.log
+AUDITORIA_LOCAL.txt
 
 # Archivos del sistema
 .DS_Store

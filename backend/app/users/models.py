@@ -1,9 +1,9 @@
 """User and role persistence models."""
 
-from datetime import datetime
+from datetime import date, datetime
 
 from app.core.database import Base
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 
@@ -24,11 +24,69 @@ class User(Base):
     roles: Mapped[list["UserRole"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
+    profile: Mapped["UserProfile | None"] = relationship(
+        back_populates="user", uselist=False, cascade="all, delete-orphan"
+    )
 
     @validates("email")
     def normalize_email(self, key: str, value: str) -> str:
         """Normalize email addresses before persistence."""
         return value.strip().lower()
+
+    @property
+    def permissions(self) -> list[str]:
+        """Return active permissions granted through active roles."""
+        return sorted(
+            {
+                role_permission.permission.name
+                for user_role in self.roles
+                if user_role.role.is_active
+                for role_permission in user_role.role.permissions
+                if role_permission.permission.is_active
+            }
+        )
+
+    @property
+    def first_name(self) -> str | None:
+        """Expose profile first name for API serialization."""
+        return self.profile.first_name if self.profile else None
+
+    @property
+    def last_name(self) -> str | None:
+        """Expose profile last name for API serialization."""
+        return self.profile.last_name if self.profile else None
+
+    @property
+    def identification_number(self) -> str | None:
+        """Expose profile identification number for API serialization."""
+        return self.profile.identification_number if self.profile else None
+
+    @property
+    def birth_date(self) -> date | None:
+        """Expose profile birth date for API serialization."""
+        return self.profile.birth_date if self.profile else None
+
+    @property
+    def phone(self) -> str | None:
+        """Expose profile phone for API serialization."""
+        return self.profile.phone if self.profile else None
+
+
+class UserProfile(Base):
+    """Personal and academic identity data separated from credentials."""
+
+    __tablename__ = "user_profiles"
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    first_name: Mapped[str] = mapped_column(String(80), nullable=False)
+    last_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    identification_number: Mapped[str] = mapped_column(
+        String(40), unique=True, index=True, nullable=False
+    )
+    birth_date: Mapped[date] = mapped_column(Date, nullable=False)
+    phone: Mapped[str] = mapped_column(String(25), nullable=False)
+    user: Mapped[User] = relationship(back_populates="profile")
 
 
 class UserRole(Base):
