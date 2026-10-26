@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import type {
   Enrollment,
   EnrollmentCreate,
@@ -13,8 +13,10 @@ import type {
   SubjectUpdate,
   User,
   UserCreate,
+  UserLookup,
   UserUpdate,
 } from '../../api/types';
+import { usersService } from '../../services/users.service';
 import { Button } from '../ui/Button';
 import { Field } from './Field';
 
@@ -152,9 +154,18 @@ export function SubjectCreateForm({
 }: {
   onSubmit: (data: SubjectCreate) => Promise<void>;
   busy: boolean;
-  teachers: User[];
+  teachers?: UserLookup[];
 }) {
   const [data, setData] = useState<SubjectCreate>({ code: '', name: '', credits: 3 });
+  const [teacherSearch, setTeacherSearch] = useState('');
+  const [teacherOptions, setTeacherOptions] = useState<UserLookup[]>(teachers ?? []);
+  useEffect(() => {
+    if (teacherSearch.trim().length < 2) return;
+    const timer = window.setTimeout(() => {
+      void usersService.lookup('teacher', teacherSearch.trim()).then(setTeacherOptions);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [teacherSearch]);
   return (
     <FormCard
       title="Crear materia"
@@ -191,6 +202,13 @@ export function SubjectCreateForm({
         onChange={(e) => setData({ ...data, credits: Number(e.target.value) })}
       />
       <div className="field">
+        <label htmlFor="subject-teacher-search">Buscar docente</label>
+        <input
+          id="subject-teacher-search"
+          value={teacherSearch}
+          onChange={(e) => setTeacherSearch(e.target.value)}
+          placeholder="Nombre o correo"
+        />
         <label htmlFor="subject-teacher">Docente</label>
         <select
           id="subject-teacher"
@@ -201,13 +219,11 @@ export function SubjectCreateForm({
           <option value="" disabled>
             Selecciona un docente
           </option>
-          {teachers
-            .filter((teacher) => teacher.roles.includes('teacher') && teacher.is_active)
-            .map((teacher) => (
-              <option value={teacher.id} key={teacher.id}>
-                {teacher.full_name} ({teacher.email})
-              </option>
-            ))}
+          {teacherOptions.map((teacher) => (
+            <option value={teacher.id} key={teacher.id}>
+              {teacher.display_name} ({teacher.email})
+            </option>
+          ))}
         </select>
       </div>
     </FormCard>
@@ -264,7 +280,7 @@ export function EnrollmentCreateForm({
 }: {
   onSubmit: (data: EnrollmentCreate) => Promise<void>;
   busy: boolean;
-  students: User[];
+  students?: UserLookup[];
   subjects: Subject[];
   periods: Period[];
 }) {
@@ -273,6 +289,15 @@ export function EnrollmentCreateForm({
     subject_id: 0,
     period_id: 0,
   });
+  const [studentSearch, setStudentSearch] = useState('');
+  const [studentOptions, setStudentOptions] = useState<UserLookup[]>(students ?? []);
+  useEffect(() => {
+    if (studentSearch.trim().length < 2) return;
+    const timer = window.setTimeout(() => {
+      void usersService.lookup('student', studentSearch.trim()).then(setStudentOptions);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [studentSearch]);
   return (
     <FormCard
       title="Crear inscripción"
@@ -283,6 +308,13 @@ export function EnrollmentCreateForm({
       }}
     >
       <div className="field">
+        <label htmlFor="enrollment-student-search">Buscar estudiante</label>
+        <input
+          id="enrollment-student-search"
+          value={studentSearch}
+          onChange={(e) => setStudentSearch(e.target.value)}
+          placeholder="Nombre o correo"
+        />
         <label htmlFor="enrollment-student">Estudiante</label>
         <select
           id="enrollment-student"
@@ -293,14 +325,11 @@ export function EnrollmentCreateForm({
           <option value="" disabled>
             Selecciona un estudiante
           </option>
-          {students
-            .filter((student) => student.roles.includes('student') && student.is_active)
-            .slice(0, 10)
-            .map((student) => (
-              <option value={student.id} key={student.id}>
-                {student.full_name} ({student.email})
-              </option>
-            ))}
+          {studentOptions.map((student) => (
+            <option value={student.id} key={student.id}>
+              {student.display_name} ({student.email})
+            </option>
+          ))}
         </select>
       </div>
       <div className="field">
@@ -354,9 +383,18 @@ export function GradeCreateForm({
   onSubmit: (data: GradeCreate) => Promise<void>;
   busy: boolean;
   enrollments: Enrollment[];
-  students: User[];
+  students?: UserLookup[];
 }) {
   const [data, setData] = useState<GradeCreate>({ enrollment_id: 0, score: 0, assessment: '' });
+  const [studentSearch, setStudentSearch] = useState('');
+  const [studentOptions, setStudentOptions] = useState<UserLookup[]>(students ?? []);
+  useEffect(() => {
+    if (studentSearch.trim().length < 2) return;
+    const timer = window.setTimeout(() => {
+      void usersService.lookup('student', studentSearch.trim()).then(setStudentOptions);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [studentSearch]);
   return (
     <FormCard
       title="Registrar calificación"
@@ -367,6 +405,13 @@ export function GradeCreateForm({
       }}
     >
       <div className="field">
+        <label htmlFor="grade-student-search">Buscar estudiante</label>
+        <input
+          id="grade-student-search"
+          value={studentSearch}
+          onChange={(e) => setStudentSearch(e.target.value)}
+          placeholder="Nombre o correo"
+        />
         <label htmlFor="grade-enrollment">Estudiante e inscripción</label>
         <select
           id="grade-enrollment"
@@ -377,14 +422,19 @@ export function GradeCreateForm({
           <option value="" disabled>
             Selecciona un estudiante
           </option>
-          {enrollments.map((enrollment) => {
-            const student = students.find((item) => item.id === enrollment.student_id);
-            return (
-              <option value={enrollment.id} key={enrollment.id}>
-                #{enrollment.id} - {student?.full_name ?? `Estudiante ${enrollment.student_id}`}
-              </option>
-            );
-          })}
+          {enrollments
+            .filter((enrollment) =>
+              studentOptions.some((student) => student.id === enrollment.student_id),
+            )
+            .map((enrollment) => {
+              const student = studentOptions.find((item) => item.id === enrollment.student_id);
+              return (
+                <option value={enrollment.id} key={enrollment.id}>
+                  #{enrollment.id} -{' '}
+                  {student?.display_name ?? `Estudiante ${enrollment.student_id}`}
+                </option>
+              );
+            })}
         </select>
       </div>
       <Field

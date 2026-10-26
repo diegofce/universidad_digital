@@ -20,9 +20,9 @@ from app.users.schemas import (
     UserCreate,
     UserUpdate,
 )
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 
 def _roles_by_name(db: Session, names: list[str]) -> list[Role]:
@@ -93,7 +93,17 @@ def create_user(
 
 def get_user(db: Session, user_id: int) -> User:
     """Fetch one user or return a controlled not-found error."""
-    user = db.get(User, user_id)
+    user = db.scalar(
+        select(User)
+        .options(
+            selectinload(User.profile),
+            selectinload(User.roles)
+            .selectinload(UserRole.role)
+            .selectinload(Role.permissions)
+            .selectinload(RolePermission.permission),
+        )
+        .where(User.id == user_id)
+    )
     if user is None:
         raise AppError("User not found", 404)
     return user
@@ -102,7 +112,52 @@ def get_user(db: Session, user_id: int) -> User:
 def list_users(db: Session, offset: int = 0, limit: int = 100) -> list[User]:
     """Return a bounded page of users."""
     return list(
-        db.scalars(select(User).order_by(User.id).offset(offset).limit(limit)).all()
+        db.scalars(
+            select(User)
+            .options(
+                selectinload(User.profile),
+                selectinload(User.roles)
+                .selectinload(UserRole.role)
+                .selectinload(Role.permissions)
+                .selectinload(RolePermission.permission),
+            )
+            .order_by(User.id)
+            .offset(offset)
+            .limit(limit)
+        ).all()
+    )
+
+
+def lookup_users(
+    db: Session,
+    role_name: str,
+    search: str,
+    limit: int = 10,
+) -> list[User]:
+    """Return active, role-scoped users for academic selectors only."""
+    pattern = f"%{search.strip()}%"
+    return list(
+        db.scalars(
+            select(User)
+            .join(UserRole, UserRole.user_id == User.id)
+            .join(Role, Role.id == UserRole.role_id)
+            .outerjoin(UserProfile, UserProfile.user_id == User.id)
+            .options(selectinload(User.profile))
+            .where(
+                User.is_active.is_(True),
+                Role.is_active.is_(True),
+                Role.name == role_name,
+                or_(
+                    User.email.ilike(pattern),
+                    User.full_name.ilike(pattern),
+                    UserProfile.first_name.ilike(pattern),
+                    UserProfile.last_name.ilike(pattern),
+                ),
+            )
+            .distinct()
+            .order_by(User.full_name, User.id)
+            .limit(limit)
+        ).all()
     )
 
 

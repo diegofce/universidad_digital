@@ -1,6 +1,6 @@
 import { Pencil, Power, RotateCcw, Trash2, XCircle } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { unstable_usePrompt, useLocation } from 'react-router-dom';
 import type { Enrollment, Grade, Period, Subject, User } from '../api/types';
 import { ErrorMessage, Loading } from '../components/feedback/State';
 import {
@@ -48,14 +48,9 @@ const titles: Record<string, string> = {
 };
 export function WorkspacePage() {
   const path = useLocation().pathname;
-  const navigate = useNavigate();
   const title = titles[path] ?? 'Espacio académico';
-  const needsUsers =
-    path === '/admin/users' ||
-    path === '/admin/subjects' ||
-    path.endsWith('/enrollments') ||
-    path.endsWith('/grades');
-  const users = useUsers(needsUsers);
+  const needsUsers = path === '/admin/users';
+  const users = useUsers(needsUsers, true);
   const subjects = useSubjects(path.endsWith('/subjects'));
   const enrollments = useEnrollments(path.endsWith('/enrollments'));
   const grades = useGrades(path.endsWith('/grades') || path.endsWith('/summary'));
@@ -68,25 +63,13 @@ export function WorkspacePage() {
   const [editingPeriod, setEditingPeriod] = useState<Period | null>(null);
   const [editingEnrollment, setEditingEnrollment] = useState<Enrollment | null>(null);
   const [editingGrade, setEditingGrade] = useState<Grade | null>(null);
-  const previousPath = useRef(path);
   const hasDraft = Boolean(
     editingUser || editingSubject || editingPeriod || editingEnrollment || editingGrade,
   );
-  useEffect(() => {
-    if (previousPath.current !== path) {
-      const shouldLeave = !hasDraft || window.confirm('¿Salir sin guardar los cambios?');
-      if (!shouldLeave) {
-        navigate(previousPath.current, { replace: true });
-      } else {
-        setEditingUser(null);
-        setEditingSubject(null);
-        setEditingPeriod(null);
-        setEditingEnrollment(null);
-        setEditingGrade(null);
-        previousPath.current = path;
-      }
-    }
-  }, [hasDraft, navigate, path]);
+  unstable_usePrompt({
+    when: hasDraft,
+    message: '¿Salir sin guardar los cambios?',
+  });
   const is = (value: string) => path.endsWith(value);
   const data = is('users')
     ? users
@@ -144,7 +127,6 @@ export function WorkspacePage() {
     ) : path === '/admin/subjects' ? (
       <SubjectCreateForm
         busy={busy}
-        teachers={users.data}
         onSubmit={async (payload) => {
           await runMutation(subjectsService.create(payload), subjects.refresh, setMessage, setBusy);
         }}
@@ -159,7 +141,6 @@ export function WorkspacePage() {
     ) : path === '/admin/enrollments' ? (
       <EnrollmentCreateForm
         busy={busy}
-        students={users.data}
         subjects={subjects.data}
         periods={periods.data}
         onSubmit={async (payload) => {
@@ -175,7 +156,6 @@ export function WorkspacePage() {
       <GradeCreateForm
         busy={busy}
         enrollments={enrollments.data}
-        students={users.data}
         onSubmit={async (payload) => {
           await runMutation(gradesService.create(payload), grades.refresh, setMessage, setBusy);
         }}

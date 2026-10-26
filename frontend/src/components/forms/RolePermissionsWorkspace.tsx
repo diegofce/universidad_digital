@@ -190,7 +190,13 @@ export function RolePermissionsWorkspace() {
                         setSelectedRole(role);
                         setRoleName(role.name);
                         setRoleDescription(role.description);
-                        setSelectedPermissions(role.permissions ?? []);
+                        setSelectedPermissions(
+                          (role.permissions ?? []).filter((name) =>
+                            permissions.some(
+                              (permission) => permission.name === name && permission.is_active,
+                            ),
+                          ),
+                        );
                       }}
                     >
                       Editar
@@ -209,7 +215,8 @@ export function RolePermissionsWorkspace() {
             <label className="check-row" key={permission.id}>
               <input
                 type="checkbox"
-                checked={selectedPermissions.includes(permission.name)}
+                disabled={!permission.is_active}
+                checked={permission.is_active && selectedPermissions.includes(permission.name)}
                 onChange={(event) =>
                   setSelectedPermissions(
                     event.target.checked
@@ -218,7 +225,8 @@ export function RolePermissionsWorkspace() {
                   )
                 }
               />{' '}
-              {permission.name} <span className="muted">{permission.description}</span>
+              {permission.name} {!permission.is_active && <span className="badge">Inactivo</span>}{' '}
+              <span className="muted">{permission.description}</span>
             </label>
           ))
         ) : (

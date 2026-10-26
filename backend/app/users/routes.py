@@ -15,6 +15,7 @@ from app.users.schemas import (
     RoleResponse,
     RoleUpdate,
     UserCreate,
+    UserLookupResponse,
     UserResponse,
     UserUpdate,
 )
@@ -32,6 +33,38 @@ Db = Annotated[Session, Depends(get_db)]
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def create(data: UserCreate, db: Db, _: Admin) -> User:
     return services.create_user(db, data, _.id)
+
+
+@router.get("/lookup", response_model=list[UserLookupResponse])
+def lookup(
+    db: Db,
+    _: Annotated[
+        User,
+        Depends(
+            require_permissions(
+                "subjects.manage", "enrollments.manage", "grades.manage"
+            )
+        ),
+    ],
+    role: str = Query(pattern="^(teacher|student)$"),
+    search: str = Query(min_length=2, max_length=80),
+    limit: int = Query(default=10, ge=1, le=10),
+) -> list[UserLookupResponse]:
+    """Search minimal teacher/student data for authorized academic selectors."""
+    users = services.lookup_users(db, role, search, limit)
+    return [
+        UserLookupResponse(
+            id=user.id,
+            display_name=(
+                f"{user.profile.first_name} {user.profile.last_name}"
+                if user.profile
+                else user.full_name
+            ),
+            email=user.email,
+            role=role,
+        )
+        for user in users
+    ]
 
 
 @router.get("/roles", response_model=list[RoleResponse])

@@ -15,6 +15,12 @@ export interface User {
   birth_date: string | null;
   phone: string | null;
 }
+export interface UserLookup {
+  id: number;
+  display_name: string;
+  email: string;
+  role: 'teacher' | 'student';
+}
 export interface Role {
   id: number;
   name: string;

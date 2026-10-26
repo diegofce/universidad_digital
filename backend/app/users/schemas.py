@@ -1,6 +1,7 @@
 """Validated user request and response schemas."""
 
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
@@ -53,6 +54,21 @@ class UserUpdate(BaseModel):
             raise ValueError("birth_date cannot be in the future")
         return value
 
+    @field_validator(
+        "first_name",
+        "last_name",
+        "identification_number",
+        "birth_date",
+        "phone",
+        mode="before",
+    )
+    @classmethod
+    def reject_null_profile_fields(cls, value: object) -> object:
+        """Reject explicit null while keeping partial omission valid."""
+        if value is None:
+            raise ValueError("profile fields cannot be null")
+        return value
+
 
 class UserResponse(BaseModel):
     """Public user representation without credential data."""
@@ -78,6 +94,15 @@ class UserResponse(BaseModel):
         if value is None:
             return []
         return [getattr(role, "role_name", role) for role in value]
+
+
+class UserLookupResponse(BaseModel):
+    """Minimal non-sensitive user data for academic selectors."""
+
+    id: int
+    display_name: str
+    email: EmailStr
+    role: Literal["teacher", "student"]
 
 
 class LoginRequest(BaseModel):
