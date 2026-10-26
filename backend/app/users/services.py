@@ -2,7 +2,15 @@
 
 from app.core.errors import AppError
 from app.core.security import hash_password
-from app.users.models import Permission, Role, RoleAudit, RolePermission, User, UserRole
+from app.users.models import (
+    Permission,
+    Role,
+    RoleAudit,
+    RolePermission,
+    User,
+    UserProfile,
+    UserRole,
+)
 from app.users.schemas import (
     PermissionCreate,
     PermissionUpdate,
@@ -60,13 +68,22 @@ def create_user(
         full_name=data.full_name,
         password_hash=hash_password(data.password),
     )
+    user.profile = UserProfile(
+        first_name=data.first_name,
+        last_name=data.last_name,
+        identification_number=data.identification_number,
+        birth_date=data.birth_date,
+        phone=data.phone,
+    )
     user.roles = [UserRole(role=role) for role in roles]
     db.add(user)
     try:
         db.commit()
     except IntegrityError as exc:
         db.rollback()
-        raise AppError("Email is already registered", 409) from exc
+        raise AppError(
+            "Email or identification number is already registered", 409
+        ) from exc
     if roles:
         _audit(db, "user.roles.created", actor_user_id, details=f"user_id={user.id}")
         db.commit()
@@ -103,6 +120,32 @@ def update_user(
     if values.get("password") is not None:
         values["password_hash"] = hash_password(values.pop("password"))
     roles = values.pop("roles", None)
+    profile_fields = {
+        field: values.pop(field)
+        for field in (
+            "first_name",
+            "last_name",
+            "identification_number",
+            "birth_date",
+            "phone",
+        )
+        if field in values
+    }
+    if profile_fields:
+        if user.profile is None:
+            required_profile_fields = {
+                "first_name",
+                "last_name",
+                "identification_number",
+                "birth_date",
+                "phone",
+            }
+            if set(profile_fields) != required_profile_fields:
+                raise AppError("Complete the personal profile before updating it", 422)
+            user.profile = UserProfile(**profile_fields)
+        else:
+            for field, value in profile_fields.items():
+                setattr(user.profile, field, value)
     if roles is not None:
         user.roles = [UserRole(role=role) for role in _roles_by_name(db, roles)]
     for field, value in values.items():
@@ -111,7 +154,9 @@ def update_user(
         db.commit()
     except IntegrityError as exc:
         db.rollback()
-        raise AppError("Email is already registered", 409) from exc
+        raise AppError(
+            "Email or identification number is already registered", 409
+        ) from exc
     if roles is not None:
         _audit(db, "user.roles.updated", actor_user_id, details=f"user_id={user.id}")
         db.commit()

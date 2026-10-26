@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { Pencil, Power, RotateCcw, Trash2, XCircle } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import type { Enrollment, Grade, Period, Subject, User } from '../api/types';
 import { ErrorMessage, Loading } from '../components/feedback/State';
 import {
@@ -14,6 +15,7 @@ import {
   UserCreateForm,
   UserEditForm,
 } from '../components/forms/CrudForms';
+import { RolePermissionsWorkspace } from '../components/forms/RolePermissionsWorkspace';
 import { DataTable } from '../components/tables/DataTable';
 import { Button } from '../components/ui/Button';
 import { useAuth } from '../hooks/useAuth';
@@ -46,20 +48,45 @@ const titles: Record<string, string> = {
 };
 export function WorkspacePage() {
   const path = useLocation().pathname;
+  const navigate = useNavigate();
   const title = titles[path] ?? 'Espacio académico';
-  const users = useUsers();
-  const subjects = useSubjects();
-  const enrollments = useEnrollments();
-  const grades = useGrades();
-  const periods = usePeriods();
+  const needsUsers =
+    path === '/admin/users' ||
+    path === '/admin/subjects' ||
+    path.endsWith('/enrollments') ||
+    path.endsWith('/grades');
+  const users = useUsers(needsUsers);
+  const subjects = useSubjects(path.endsWith('/subjects'));
+  const enrollments = useEnrollments(path.endsWith('/enrollments'));
+  const grades = useGrades(path.endsWith('/grades') || path.endsWith('/summary'));
+  const periods = usePeriods(path.endsWith('/periods') || path === '/admin/enrollments');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
-  const { hasPermission } = useAuth();
+  const { hasPermission, hasRole } = useAuth();
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
   const [editingPeriod, setEditingPeriod] = useState<Period | null>(null);
   const [editingEnrollment, setEditingEnrollment] = useState<Enrollment | null>(null);
   const [editingGrade, setEditingGrade] = useState<Grade | null>(null);
+  const previousPath = useRef(path);
+  const hasDraft = Boolean(
+    editingUser || editingSubject || editingPeriod || editingEnrollment || editingGrade,
+  );
+  useEffect(() => {
+    if (previousPath.current !== path) {
+      const shouldLeave = !hasDraft || window.confirm('¿Salir sin guardar los cambios?');
+      if (!shouldLeave) {
+        navigate(previousPath.current, { replace: true });
+      } else {
+        setEditingUser(null);
+        setEditingSubject(null);
+        setEditingPeriod(null);
+        setEditingEnrollment(null);
+        setEditingGrade(null);
+        previousPath.current = path;
+      }
+    }
+  }, [hasDraft, navigate, path]);
   const is = (value: string) => path.endsWith(value);
   const data = is('users')
     ? users
@@ -81,6 +108,14 @@ export function WorkspacePage() {
             El backend actual no expone un endpoint de auditoría. No se muestran datos inventados.
           </p>
         </section>
+      </>
+    );
+  if (path === '/admin/roles')
+    return (
+      <>
+        <p className="muted">ADMINISTRACIÓN</p>
+        <h1>{title}</h1>
+        <RolePermissionsWorkspace />
       </>
     );
   if (is('summary')) return <Summary />;
@@ -109,6 +144,7 @@ export function WorkspacePage() {
     ) : path === '/admin/subjects' ? (
       <SubjectCreateForm
         busy={busy}
+        teachers={users.data}
         onSubmit={async (payload) => {
           await runMutation(subjectsService.create(payload), subjects.refresh, setMessage, setBusy);
         }}
@@ -123,6 +159,9 @@ export function WorkspacePage() {
     ) : path === '/admin/enrollments' ? (
       <EnrollmentCreateForm
         busy={busy}
+        students={users.data}
+        subjects={subjects.data}
+        periods={periods.data}
         onSubmit={async (payload) => {
           await runMutation(
             enrollmentsService.create(payload),
@@ -135,6 +174,8 @@ export function WorkspacePage() {
     ) : path.endsWith('/grades') && hasPermission('grades.manage') ? (
       <GradeCreateForm
         busy={busy}
+        enrollments={enrollments.data}
+        students={users.data}
         onSubmit={async (payload) => {
           await runMutation(gradesService.create(payload), grades.refresh, setMessage, setBusy);
         }}
@@ -142,73 +183,93 @@ export function WorkspacePage() {
     ) : null;
   const editForm = editingUser ? (
     <UserEditForm
+      key={editingUser.id}
       initial={editingUser}
       busy={busy}
       onSubmit={async (payload) => {
-        await runMutation(
-          usersService.update(editingUser.id, payload),
-          users.refresh,
-          setMessage,
-          setBusy,
-        );
-        setEditingUser(null);
+        if (
+          await runMutation(
+            usersService.update(editingUser.id, payload),
+            users.refresh,
+            setMessage,
+            setBusy,
+          )
+        )
+          setEditingUser(null);
       }}
+      onCancel={() => setEditingUser(null)}
     />
   ) : editingSubject ? (
     <SubjectEditForm
+      key={editingSubject.id}
       initial={editingSubject}
       busy={busy}
       onSubmit={async (payload) => {
-        await runMutation(
-          subjectsService.update(editingSubject.id, payload),
-          subjects.refresh,
-          setMessage,
-          setBusy,
-        );
-        setEditingSubject(null);
+        if (
+          await runMutation(
+            subjectsService.update(editingSubject.id, payload),
+            subjects.refresh,
+            setMessage,
+            setBusy,
+          )
+        )
+          setEditingSubject(null);
       }}
+      onCancel={() => setEditingSubject(null)}
     />
   ) : editingPeriod ? (
     <PeriodEditForm
+      key={editingPeriod.id}
       initial={editingPeriod}
       busy={busy}
       onSubmit={async (payload) => {
-        await runMutation(
-          periodsService.update(editingPeriod.id, payload),
-          periods.refresh,
-          setMessage,
-          setBusy,
-        );
-        setEditingPeriod(null);
+        if (
+          await runMutation(
+            periodsService.update(editingPeriod.id, payload),
+            periods.refresh,
+            setMessage,
+            setBusy,
+          )
+        )
+          setEditingPeriod(null);
       }}
+      onCancel={() => setEditingPeriod(null)}
     />
   ) : editingEnrollment ? (
     <EnrollmentEditForm
+      key={editingEnrollment.id}
       initial={editingEnrollment}
       busy={busy}
       onSubmit={async (status) => {
-        await runMutation(
-          enrollmentsService.update(editingEnrollment.id, status),
-          enrollments.refresh,
-          setMessage,
-          setBusy,
-        );
-        setEditingEnrollment(null);
+        if (
+          await runMutation(
+            enrollmentsService.update(editingEnrollment.id, status),
+            enrollments.refresh,
+            setMessage,
+            setBusy,
+          )
+        )
+          setEditingEnrollment(null);
       }}
+      onCancel={() => setEditingEnrollment(null)}
     />
   ) : editingGrade ? (
     <GradeEditForm
+      key={editingGrade.id}
       initial={editingGrade}
       busy={busy}
       onSubmit={async (payload) => {
-        await runMutation(
-          gradesService.update(editingGrade.id, payload),
-          grades.refresh,
-          setMessage,
-          setBusy,
-        );
-        setEditingGrade(null);
+        if (
+          await runMutation(
+            gradesService.update(editingGrade.id, payload),
+            grades.refresh,
+            setMessage,
+            setBusy,
+          )
+        )
+          setEditingGrade(null);
       }}
+      onCancel={() => setEditingGrade(null)}
     />
   ) : null;
   const rows = is('users')
@@ -219,7 +280,8 @@ export function WorkspacePage() {
         item.is_active ? <span className="badge">Activo</span> : 'Inactivo',
         <div className="table-actions">
           <Button className="secondary" onClick={() => setEditingUser(item)} disabled={busy}>
-            Editar
+            <Pencil size={16} aria-hidden="true" />
+            <span className="sr-only">Editar usuario</span>
           </Button>
           {item.is_active && (
             <Button
@@ -235,7 +297,8 @@ export function WorkspacePage() {
               }}
               disabled={busy}
             >
-              Desactivar
+              <Power size={16} aria-hidden="true" />
+              <span className="sr-only">Desactivar usuario</span>
             </Button>
           )}
         </div>,
@@ -250,7 +313,8 @@ export function WorkspacePage() {
           <div className="table-actions">
             {path === '/admin/subjects' && (
               <Button className="secondary" onClick={() => setEditingSubject(item)} disabled={busy}>
-                Editar
+                <Pencil size={16} aria-hidden="true" />
+                <span className="sr-only">Editar materia</span>
               </Button>
             )}
             {path === '/admin/subjects' && item.is_active && (
@@ -267,12 +331,14 @@ export function WorkspacePage() {
                 }}
                 disabled={busy}
               >
-                Desactivar
+                <Power size={16} aria-hidden="true" />
+                <span className="sr-only">Desactivar materia</span>
               </Button>
             )}
             {path === '/admin/subjects' && !item.is_active && (
               <Button className="secondary" onClick={() => setEditingSubject(item)} disabled={busy}>
-                Reactivar
+                <RotateCcw size={16} aria-hidden="true" />
+                <span className="sr-only">Reactivar materia</span>
               </Button>
             )}
           </div>,
@@ -296,13 +362,16 @@ export function WorkspacePage() {
               String(item.student_id),
               item.status,
               <div className="table-actions">
-                <Button
-                  className="secondary"
-                  onClick={() => setEditingEnrollment(item)}
-                  disabled={busy}
-                >
-                  Editar
-                </Button>
+                {(hasRole('administrator') || hasRole('teacher')) && (
+                  <Button
+                    className="secondary"
+                    onClick={() => setEditingEnrollment(item)}
+                    disabled={busy}
+                  >
+                    <Pencil size={16} aria-hidden="true" />
+                    <span className="sr-only">Editar inscripción</span>
+                  </Button>
+                )}
                 {item.status !== 'cancelled' && (
                   <Button
                     className="danger"
@@ -317,7 +386,8 @@ export function WorkspacePage() {
                     }}
                     disabled={busy}
                   >
-                    Cancelar
+                    <XCircle size={16} aria-hidden="true" />
+                    <span className="sr-only">Cancelar inscripción</span>
                   </Button>
                 )}
               </div>,
@@ -334,7 +404,8 @@ export function WorkspacePage() {
                     onClick={() => setEditingGrade(item)}
                     disabled={busy}
                   >
-                    Editar
+                    <Pencil size={16} aria-hidden="true" />
+                    <span className="sr-only">Editar calificación</span>
                   </Button>
                 )}
                 {hasPermission('grades.manage') && (
@@ -351,7 +422,8 @@ export function WorkspacePage() {
                     }}
                     disabled={busy}
                   >
-                    Eliminar
+                    <Trash2 size={16} aria-hidden="true" />
+                    <span className="sr-only">Eliminar calificación</span>
                   </Button>
                 )}
               </div>,
@@ -395,14 +467,16 @@ async function runMutation<T>(
   refresh: () => void,
   setMessage: (message: string) => void,
   setBusy: (busy: boolean) => void,
-) {
+): Promise<boolean> {
   setBusy(true);
   try {
     await operation;
     refresh();
     setMessage('Operación completada correctamente.');
+    return true;
   } catch (error) {
     setMessage(getErrorMessage(error));
+    return false;
   } finally {
     setBusy(false);
   }
@@ -410,13 +484,15 @@ async function runMutation<T>(
 function Summary() {
   const { user } = useAuth();
   const [summary, setSummary] = useState<number | null>(null);
+  const [pending, setPending] = useState(true);
   const [error, setError] = useState('');
   useEffect(() => {
     if (user) {
       void gradesService
         .summary(user.id)
         .then((result) => setSummary(result.weighted_average))
-        .catch((reason: unknown) => setError(getErrorMessage(reason)));
+        .catch((reason: unknown) => setError(getErrorMessage(reason)))
+        .finally(() => setPending(false));
     }
   }, [user]);
   if (!user) return null;
@@ -430,7 +506,7 @@ function Summary() {
           <ErrorMessage message={error} />
         ) : (
           <strong style={{ fontSize: '3rem' }}>
-            {summary === null ? '...' : summary.toFixed(2)}
+            {pending ? '...' : summary === null ? 'Sin calificaciones' : summary.toFixed(2)}
           </strong>
         )}
       </section>

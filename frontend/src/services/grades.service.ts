@@ -13,5 +13,8 @@ export const gradesService = {
       .get<GradeSummary>(`${endpoints.grades}summary/${studentId}`, {
         params: periodId ? { period_id: periodId } : undefined,
       })
-      .then((r) => r.data),
+      .then((r) => ({
+        ...r.data,
+        weighted_average: r.data.weighted_average === null ? null : Number(r.data.weighted_average),
+      })),
 };

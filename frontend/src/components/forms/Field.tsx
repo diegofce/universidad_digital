@@ -1,10 +1,11 @@
-import type { InputHTMLAttributes } from 'react';
+import { useId, type InputHTMLAttributes } from 'react';
 export function Field({
   label,
   error,
   ...props
 }: InputHTMLAttributes<HTMLInputElement> & { label: string; error?: string }) {
-  const id = props.id ?? props.name;
+  const generatedId = useId();
+  const id = props.id ?? props.name ?? `field-${generatedId.replaceAll(':', '')}`;
   return (
     <div className="field">
       <label htmlFor={id}>{label}</label>

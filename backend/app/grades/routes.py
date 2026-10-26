@@ -61,6 +61,8 @@ def summary(
 ) -> GradeSummaryResponse:
     """Return a credit-weighted average within the caller's scope."""
     roles = active_role_names(actor)
+    if not roles.intersection({"administrator", "teacher", "student"}):
+        raise AppError("Insufficient permissions", 403)
     if "student" in roles and student_id != actor.id:
         raise AppError("Grade summary not found", 404)
     teacher_id = (
@@ -86,7 +88,7 @@ def get_one(item_id: int, db: Db, actor: Actor) -> GradeResponse:
 
 @router.put("/{item_id}", response_model=GradeResponse)
 def update(item_id: int, data: GradeUpdate, db: Db, actor: Staff) -> GradeResponse:
-    roles = {role.role_name for role in actor.roles}
+    roles = active_role_names(actor)
     if not roles.intersection({"administrator", "teacher"}):
         raise AppError("Insufficient permissions", 403)
     return services.update_grade(
