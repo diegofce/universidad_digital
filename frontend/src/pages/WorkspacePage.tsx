@@ -1,5 +1,5 @@
 import { Pencil, Power, RotateCcw, Trash2, XCircle } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { unstable_usePrompt, useLocation } from 'react-router-dom';
 import type { Enrollment, Grade, Period, Subject, User } from '../api/types';
 import { ErrorMessage, Loading } from '../components/feedback/State';
@@ -66,10 +66,21 @@ export function WorkspacePage() {
   const hasDraft = Boolean(
     editingUser || editingSubject || editingPeriod || editingEnrollment || editingGrade,
   );
+  const previousPath = useRef(path);
   unstable_usePrompt({
     when: hasDraft,
     message: '¿Salir sin guardar los cambios?',
   });
+  useEffect(() => {
+    if (previousPath.current === path) return;
+    setEditingUser(null);
+    setEditingSubject(null);
+    setEditingPeriod(null);
+    setEditingEnrollment(null);
+    setEditingGrade(null);
+    setMessage('');
+    previousPath.current = path;
+  }, [path]);
   const is = (value: string) => path.endsWith(value);
   const data = is('users')
     ? users
