@@ -1,16 +1,14 @@
-import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 export function ProtectedRoute() {
   const { user, isLoading, connectionError } = useAuth();
-  const location = useLocation();
   if (isLoading)
     return (
       <main className="center-state">
         <p aria-live="polite">Validando sesión...</p>
       </main>
     );
-  if (!user && !connectionError)
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  if (!user && !connectionError) return <Navigate to="/login" replace />;
   if (!user)
     return (
       <main className="center-state">

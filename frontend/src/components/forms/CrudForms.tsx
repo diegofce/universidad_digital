@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import type {
   Enrollment,
   EnrollmentCreate,
@@ -51,12 +51,161 @@ function FormCard({
   );
 }
 
+function StudentCombobox({
+  id,
+  options: initialOptions = [],
+  value,
+  onChange,
+}: {
+  id: string;
+  options?: UserLookup[];
+  value: number;
+  onChange: (studentId: number) => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [options, setOptions] = useState(initialOptions);
+  const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const lastQuery = useRef('');
+
+  useEffect(() => {
+    const trimmedQuery = query.trim();
+    if (trimmedQuery.length < 2 || trimmedQuery === lastQuery.current) return;
+    lastQuery.current = trimmedQuery;
+    setLoading(true);
+    setError('');
+    const timer = window.setTimeout(() => {
+      void usersService
+        .lookup('student', trimmedQuery)
+        .then(setOptions)
+        .catch(() => setError('No se pudieron cargar los estudiantes.'))
+        .finally(() => setLoading(false));
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
+  useEffect(() => {
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', closeOnOutsideClick);
+    return () => document.removeEventListener('mousedown', closeOnOutsideClick);
+  }, []);
+
+  const filteredOptions = options.filter((student) =>
+    `${student.display_name} ${student.email}`.toLowerCase().includes(query.trim().toLowerCase()),
+  );
+  const selectedStudent = options.find((student) => student.id === value);
+  const selectStudent = (student: UserLookup) => {
+    onChange(student.id);
+    setQuery(student.display_name);
+    setOpen(false);
+    setActiveIndex(-1);
+  };
+
+  return (
+    <div className="field" ref={containerRef}>
+      <label htmlFor={id}>Estudiante</label>
+      <div className="combobox-control">
+        <input
+          id={id}
+          role="combobox"
+          aria-autocomplete="list"
+          aria-controls={`${id}-options`}
+          aria-expanded={open}
+          aria-activedescendant={activeIndex >= 0 ? `${id}-option-${activeIndex}` : undefined}
+          value={query || selectedStudent?.display_name || ''}
+          placeholder="Busca por nombre, apellido o correo"
+          onFocus={() => {
+            setOpen(true);
+            if (selectedStudent) setQuery('');
+          }}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            onChange(0);
+            setOpen(true);
+            setActiveIndex(-1);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'ArrowDown') {
+              event.preventDefault();
+              setOpen(true);
+              setActiveIndex((index) => Math.min(index + 1, filteredOptions.length - 1));
+            } else if (event.key === 'ArrowUp') {
+              event.preventDefault();
+              setActiveIndex((index) => Math.max(index - 1, 0));
+            } else if (event.key === 'Enter' && activeIndex >= 0) {
+              event.preventDefault();
+              const student = filteredOptions[activeIndex];
+              if (student) selectStudent(student);
+            } else if (event.key === 'Escape') {
+              setOpen(false);
+            }
+          }}
+        />
+        <button
+          type="button"
+          className="combobox-toggle"
+          aria-label="Mostrar estudiantes"
+          aria-controls={`${id}-options`}
+          aria-expanded={open}
+          onClick={() => setOpen((isOpen) => !isOpen)}
+        >
+          &#9662;
+        </button>
+      </div>
+      {open && (
+        <div className="combobox-menu" id={`${id}-options`} role="listbox">
+          {loading && (
+            <p className="muted" role="status">
+              Buscando estudiantes...
+            </p>
+          )}
+          {!loading && error && (
+            <p className="alert" role="alert">
+              {error}
+            </p>
+          )}
+          {!loading && !error && query.trim().length < 2 && (
+            <p className="muted">Escribe al menos 2 caracteres para buscar.</p>
+          )}
+          {!loading && !error && query.trim().length >= 2 && filteredOptions.length === 0 && (
+            <p className="muted">No hay estudiantes coincidentes.</p>
+          )}
+          {!loading &&
+            !error &&
+            filteredOptions.map((student, index) => (
+              <button
+                type="button"
+                role="option"
+                aria-selected={student.id === value}
+                id={`${id}-option-${index}`}
+                className={index === activeIndex ? 'combobox-option active' : 'combobox-option'}
+                key={student.id}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => selectStudent(student)}
+              >
+                <strong>{student.display_name}</strong>
+                <span>{student.email}</span>
+              </button>
+            ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function UserCreateForm({
   onSubmit,
   busy,
+  onCancel,
 }: {
   onSubmit: (data: UserCreate) => Promise<void>;
   busy: boolean;
+  onCancel?: () => void;
 }) {
   const [data, setData] = useState<UserCreate>({
     email: '',
@@ -73,6 +222,7 @@ export function UserCreateForm({
     <FormCard
       title="Crear usuario"
       busy={busy}
+      onCancel={onCancel}
       onSubmit={(event) => {
         event.preventDefault();
         void onSubmit(data);
@@ -151,10 +301,12 @@ export function SubjectCreateForm({
   onSubmit,
   busy,
   teachers,
+  onCancel,
 }: {
   onSubmit: (data: SubjectCreate) => Promise<void>;
   busy: boolean;
   teachers?: UserLookup[];
+  onCancel?: () => void;
 }) {
   const [data, setData] = useState<SubjectCreate>({ code: '', name: '', credits: 3 });
   const [teacherSearch, setTeacherSearch] = useState('');
@@ -170,6 +322,7 @@ export function SubjectCreateForm({
     <FormCard
       title="Crear materia"
       busy={busy}
+      onCancel={onCancel}
       onSubmit={(event) => {
         event.preventDefault();
         void onSubmit(data);
@@ -233,15 +386,18 @@ export function SubjectCreateForm({
 export function PeriodCreateForm({
   onSubmit,
   busy,
+  onCancel,
 }: {
   onSubmit: (data: PeriodCreate) => Promise<void>;
   busy: boolean;
+  onCancel?: () => void;
 }) {
   const [data, setData] = useState<PeriodCreate>({ name: '', starts_on: '', ends_on: '' });
   return (
     <FormCard
       title="Crear periodo"
       busy={busy}
+      onCancel={onCancel}
       onSubmit={(event) => {
         event.preventDefault();
         void onSubmit(data);
@@ -277,61 +433,36 @@ export function EnrollmentCreateForm({
   students,
   subjects,
   periods,
+  onCancel,
 }: {
   onSubmit: (data: EnrollmentCreate) => Promise<void>;
   busy: boolean;
   students?: UserLookup[];
   subjects: Subject[];
   periods: Period[];
+  onCancel?: () => void;
 }) {
   const [data, setData] = useState<EnrollmentCreate>({
     student_id: 0,
     subject_id: 0,
     period_id: 0,
   });
-  const [studentSearch, setStudentSearch] = useState('');
-  const [studentOptions, setStudentOptions] = useState<UserLookup[]>(students ?? []);
-  useEffect(() => {
-    if (studentSearch.trim().length < 2) return;
-    const timer = window.setTimeout(() => {
-      void usersService.lookup('student', studentSearch.trim()).then(setStudentOptions);
-    }, 250);
-    return () => window.clearTimeout(timer);
-  }, [studentSearch]);
   return (
     <FormCard
       title="Crear inscripción"
       busy={busy}
+      onCancel={onCancel}
       onSubmit={(event) => {
         event.preventDefault();
-        void onSubmit(data);
+        if (data.student_id) void onSubmit(data);
       }}
     >
-      <div className="field">
-        <label htmlFor="enrollment-student-search">Buscar estudiante</label>
-        <input
-          id="enrollment-student-search"
-          value={studentSearch}
-          onChange={(e) => setStudentSearch(e.target.value)}
-          placeholder="Nombre o correo"
-        />
-        <label htmlFor="enrollment-student">Estudiante</label>
-        <select
-          id="enrollment-student"
-          required
-          value={data.student_id || ''}
-          onChange={(e) => setData({ ...data, student_id: Number(e.target.value) })}
-        >
-          <option value="" disabled>
-            Selecciona un estudiante
-          </option>
-          {studentOptions.map((student) => (
-            <option value={student.id} key={student.id}>
-              {student.display_name} ({student.email})
-            </option>
-          ))}
-        </select>
-      </div>
+      <StudentCombobox
+        id="enrollment-student"
+        options={students}
+        value={data.student_id}
+        onChange={(student_id) => setData({ ...data, student_id })}
+      />
       <div className="field">
         <label htmlFor="enrollment-subject">Materia</label>
         <select
@@ -379,40 +510,37 @@ export function GradeCreateForm({
   busy,
   enrollments,
   students,
+  onCancel,
 }: {
   onSubmit: (data: GradeCreate) => Promise<void>;
   busy: boolean;
   enrollments: Enrollment[];
   students?: UserLookup[];
+  onCancel?: () => void;
 }) {
   const [data, setData] = useState<GradeCreate>({ enrollment_id: 0, score: 0, assessment: '' });
-  const [studentSearch, setStudentSearch] = useState('');
-  const [studentOptions, setStudentOptions] = useState<UserLookup[]>(students ?? []);
-  useEffect(() => {
-    if (studentSearch.trim().length < 2) return;
-    const timer = window.setTimeout(() => {
-      void usersService.lookup('student', studentSearch.trim()).then(setStudentOptions);
-    }, 250);
-    return () => window.clearTimeout(timer);
-  }, [studentSearch]);
+  const [selectedStudentId, setSelectedStudentId] = useState(0);
   return (
     <FormCard
       title="Registrar calificación"
       busy={busy}
+      onCancel={onCancel}
       onSubmit={(event) => {
         event.preventDefault();
-        void onSubmit(data);
+        if (data.enrollment_id) void onSubmit(data);
       }}
     >
+      <StudentCombobox
+        id="grade-student-search"
+        options={students}
+        value={selectedStudentId}
+        onChange={(studentId) => {
+          setSelectedStudentId(studentId);
+          setData({ ...data, enrollment_id: 0 });
+        }}
+      />
       <div className="field">
-        <label htmlFor="grade-student-search">Buscar estudiante</label>
-        <input
-          id="grade-student-search"
-          value={studentSearch}
-          onChange={(e) => setStudentSearch(e.target.value)}
-          placeholder="Nombre o correo"
-        />
-        <label htmlFor="grade-enrollment">Estudiante e inscripción</label>
+        <label htmlFor="grade-enrollment">Inscripción del estudiante</label>
         <select
           id="grade-enrollment"
           required
@@ -420,18 +548,17 @@ export function GradeCreateForm({
           onChange={(e) => setData({ ...data, enrollment_id: Number(e.target.value) })}
         >
           <option value="" disabled>
-            Selecciona un estudiante
+            Selecciona una inscripción
           </option>
           {enrollments
-            .filter((enrollment) =>
-              studentOptions.some((student) => student.id === enrollment.student_id),
+            .filter(
+              (enrollment) =>
+                selectedStudentId === 0 || enrollment.student_id === selectedStudentId,
             )
             .map((enrollment) => {
-              const student = studentOptions.find((item) => item.id === enrollment.student_id);
               return (
                 <option value={enrollment.id} key={enrollment.id}>
-                  #{enrollment.id} -{' '}
-                  {student?.display_name ?? `Estudiante ${enrollment.student_id}`}
+                  #{enrollment.id} - Estudiante no identificado (ID {enrollment.student_id})
                 </option>
               );
             })}

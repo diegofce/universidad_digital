@@ -117,6 +117,13 @@ h2 {
   margin-bottom: 18px;
   flex-wrap: wrap;
 }
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 18px;
+}
 .form-actions,
 .table-actions {
   display: flex;
@@ -251,6 +258,55 @@ th {
 }
 .field small {
   color: var(--danger);
+}
+.combobox-control {
+  display: flex;
+  gap: 6px;
+}
+.combobox-control input {
+  min-width: 0;
+  flex: 1;
+}
+.combobox-toggle {
+  width: 44px;
+  border: 1px solid #9fb3c8;
+  border-radius: 5px;
+  background: #e9f2f9;
+  color: var(--navy);
+}
+.combobox-menu {
+  position: relative;
+  z-index: 3;
+  max-height: 240px;
+  overflow-y: auto;
+  margin-top: 4px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #fff;
+  box-shadow: 0 8px 20px #102a4326;
+}
+.combobox-menu p {
+  margin: 0;
+  padding: 12px;
+}
+.combobox-option {
+  display: grid;
+  width: 100%;
+  gap: 3px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  padding: 10px 12px;
+  text-align: left;
+  background: #fff;
+  color: var(--ink);
+}
+.combobox-option span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.combobox-option:hover,
+.combobox-option.active {
+  background: #e9f2f9;
 }
 .mobile-menu {
   display: none;

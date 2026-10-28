@@ -31,7 +31,7 @@ import { subjectsService } from '../services/subjects.service';
 import { usersService } from '../services/users.service';
 import { getErrorMessage } from '../utils/errors';
 const titles: Record<string, string> = {
-  '/admin/users': 'Usuarios',
+  '/admin/users': 'Lista de usuarios creados',
   '/admin/roles': 'Roles y permisos',
   '/admin/subjects': 'Materias',
   '/admin/periods': 'Periodos',
@@ -57,14 +57,16 @@ export function WorkspacePage() {
   const periods = usePeriods(path.endsWith('/periods') || path === '/admin/enrollments');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const [userPage, setUserPage] = useState(0);
   const { hasPermission, hasRole } = useAuth();
+  const [creating, setCreating] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
   const [editingPeriod, setEditingPeriod] = useState<Period | null>(null);
   const [editingEnrollment, setEditingEnrollment] = useState<Enrollment | null>(null);
   const [editingGrade, setEditingGrade] = useState<Grade | null>(null);
   const hasDraft = Boolean(
-    editingUser || editingSubject || editingPeriod || editingEnrollment || editingGrade,
+    creating || editingUser || editingSubject || editingPeriod || editingEnrollment || editingGrade,
   );
   const previousPath = useRef(path);
   unstable_usePrompt({
@@ -78,9 +80,15 @@ export function WorkspacePage() {
     setEditingPeriod(null);
     setEditingEnrollment(null);
     setEditingGrade(null);
+    setCreating(false);
+    setUserPage(0);
     setMessage('');
     previousPath.current = path;
   }, [path]);
+  useEffect(() => {
+    const lastPage = Math.max(0, Math.ceil(users.data.length / 5) - 1);
+    setUserPage((currentPage) => Math.min(currentPage, lastPage));
+  }, [users.data.length]);
   const is = (value: string) => path.endsWith(value);
   const data = is('users')
     ? users
@@ -131,6 +139,7 @@ export function WorkspacePage() {
     path === '/admin/users' ? (
       <UserCreateForm
         busy={busy}
+        onCancel={() => setCreating(false)}
         onSubmit={async (payload) => {
           await runMutation(usersService.create(payload), users.refresh, setMessage, setBusy);
         }}
@@ -138,6 +147,7 @@ export function WorkspacePage() {
     ) : path === '/admin/subjects' ? (
       <SubjectCreateForm
         busy={busy}
+        onCancel={() => setCreating(false)}
         onSubmit={async (payload) => {
           await runMutation(subjectsService.create(payload), subjects.refresh, setMessage, setBusy);
         }}
@@ -145,6 +155,7 @@ export function WorkspacePage() {
     ) : path === '/admin/periods' ? (
       <PeriodCreateForm
         busy={busy}
+        onCancel={() => setCreating(false)}
         onSubmit={async (payload) => {
           await runMutation(periodsService.create(payload), periods.refresh, setMessage, setBusy);
         }}
@@ -152,6 +163,7 @@ export function WorkspacePage() {
     ) : path === '/admin/enrollments' ? (
       <EnrollmentCreateForm
         busy={busy}
+        onCancel={() => setCreating(false)}
         subjects={subjects.data}
         periods={periods.data}
         onSubmit={async (payload) => {
@@ -166,6 +178,7 @@ export function WorkspacePage() {
     ) : path.endsWith('/grades') && hasPermission('grades.manage') ? (
       <GradeCreateForm
         busy={busy}
+        onCancel={() => setCreating(false)}
         enrollments={enrollments.data}
         onSubmit={async (payload) => {
           await runMutation(gradesService.create(payload), grades.refresh, setMessage, setBusy);
@@ -264,19 +277,28 @@ export function WorkspacePage() {
     />
   ) : null;
   const rows = is('users')
-    ? users.data.map((item) => [
+    ? users.data.slice(userPage * 5, userPage * 5 + 5).map((item) => [
         item.full_name,
         item.email,
         item.roles.join(', '),
         item.is_active ? <span className="badge">Activo</span> : 'Inactivo',
         <div className="table-actions">
-          <Button className="secondary" onClick={() => setEditingUser(item)} disabled={busy}>
+          <Button
+            className="secondary"
+            title="Editar usuario"
+            onClick={() => {
+              setCreating(false);
+              setEditingUser(item);
+            }}
+            disabled={busy}
+          >
             <Pencil size={16} aria-hidden="true" />
             <span className="sr-only">Editar usuario</span>
           </Button>
           {item.is_active && (
             <Button
               className="danger"
+              title="Desactivar usuario"
               onClick={() => {
                 if (window.confirm('¿Desactivar este usuario?'))
                   void runMutation(
@@ -303,7 +325,15 @@ export function WorkspacePage() {
           item.is_active ? 'Activa' : 'Inactiva',
           <div className="table-actions">
             {path === '/admin/subjects' && (
-              <Button className="secondary" onClick={() => setEditingSubject(item)} disabled={busy}>
+              <Button
+                className="secondary"
+                title="Editar materia"
+                onClick={() => {
+                  setCreating(false);
+                  setEditingSubject(item);
+                }}
+                disabled={busy}
+              >
                 <Pencil size={16} aria-hidden="true" />
                 <span className="sr-only">Editar materia</span>
               </Button>
@@ -311,6 +341,7 @@ export function WorkspacePage() {
             {path === '/admin/subjects' && item.is_active && (
               <Button
                 className="danger"
+                title="Desactivar materia"
                 onClick={() => {
                   if (window.confirm('¿Desactivar esta materia?'))
                     void runMutation(
@@ -327,7 +358,15 @@ export function WorkspacePage() {
               </Button>
             )}
             {path === '/admin/subjects' && !item.is_active && (
-              <Button className="secondary" onClick={() => setEditingSubject(item)} disabled={busy}>
+              <Button
+                className="secondary"
+                title="Reactivar materia"
+                onClick={() => {
+                  setCreating(false);
+                  setEditingSubject(item);
+                }}
+                disabled={busy}
+              >
                 <RotateCcw size={16} aria-hidden="true" />
                 <span className="sr-only">Reactivar materia</span>
               </Button>
@@ -340,7 +379,15 @@ export function WorkspacePage() {
             item.starts_on,
             item.ends_on,
             path === '/admin/periods' ? (
-              <Button className="secondary" onClick={() => setEditingPeriod(item)} disabled={busy}>
+              <Button
+                className="secondary"
+                title="Editar periodo"
+                onClick={() => {
+                  setCreating(false);
+                  setEditingPeriod(item);
+                }}
+                disabled={busy}
+              >
                 Editar
               </Button>
             ) : null,
@@ -350,13 +397,17 @@ export function WorkspacePage() {
               String(item.id),
               String(item.subject_id),
               String(item.period_id),
-              String(item.student_id),
+              `Estudiante no identificado (ID ${item.student_id})`,
               item.status,
               <div className="table-actions">
                 {(hasRole('administrator') || hasRole('teacher')) && (
                   <Button
                     className="secondary"
-                    onClick={() => setEditingEnrollment(item)}
+                    title="Editar inscripción"
+                    onClick={() => {
+                      setCreating(false);
+                      setEditingEnrollment(item);
+                    }}
                     disabled={busy}
                   >
                     <Pencil size={16} aria-hidden="true" />
@@ -366,6 +417,7 @@ export function WorkspacePage() {
                 {item.status !== 'cancelled' && (
                   <Button
                     className="danger"
+                    title="Cancelar inscripción"
                     onClick={() => {
                       if (window.confirm('¿Cancelar esta inscripción?'))
                         void runMutation(
@@ -392,7 +444,11 @@ export function WorkspacePage() {
                 {hasPermission('grades.manage') && (
                   <Button
                     className="secondary"
-                    onClick={() => setEditingGrade(item)}
+                    title="Editar calificación"
+                    onClick={() => {
+                      setCreating(false);
+                      setEditingGrade(item);
+                    }}
                     disabled={busy}
                   >
                     <Pencil size={16} aria-hidden="true" />
@@ -402,6 +458,7 @@ export function WorkspacePage() {
                 {hasPermission('grades.manage') && (
                   <Button
                     className="danger"
+                    title="Eliminar calificación"
                     onClick={() => {
                       if (window.confirm('¿Eliminar esta calificación?'))
                         void runMutation(
@@ -423,7 +480,10 @@ export function WorkspacePage() {
     <>
       <p className="muted">GESTIÓN ACADÉMICA</p>
       <h1>{title}</h1>
-      {createForm}
+      {!creating && !editForm && createForm && (
+        <Button onClick={() => setCreating(true)}>Crear {createLabel(path)}</Button>
+      )}
+      {creating && !editForm && createForm}
       {editForm}
       {message && (
         <p className="alert" role="status">
@@ -448,9 +508,40 @@ export function WorkspacePage() {
           }
           rows={rows}
         />
+        {is('users') && users.data.length > 0 && (
+          <div className="pagination" aria-label="Paginación de usuarios">
+            <Button
+              className="secondary"
+              onClick={() => setUserPage((page) => Math.max(0, page - 1))}
+              disabled={userPage === 0}
+            >
+              Anterior
+            </Button>
+            <span aria-live="polite">
+              Página {userPage + 1} de {Math.ceil(users.data.length / 5)}
+            </span>
+            <Button
+              className="secondary"
+              onClick={() =>
+                setUserPage((page) => Math.min(Math.ceil(users.data.length / 5) - 1, page + 1))
+              }
+              disabled={userPage >= Math.ceil(users.data.length / 5) - 1}
+            >
+              Siguiente
+            </Button>
+          </div>
+        )}
       </section>
     </>
   );
+}
+
+function createLabel(path: string) {
+  if (path === '/admin/users') return 'usuario';
+  if (path === '/admin/subjects') return 'materia';
+  if (path === '/admin/periods') return 'periodo';
+  if (path === '/admin/enrollments') return 'inscripción';
+  return 'calificación';
 }
 
 async function runMutation<T>(
