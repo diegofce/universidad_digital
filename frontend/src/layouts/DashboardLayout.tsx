@@ -1,9 +1,10 @@
 import { GraduationCap, LogOut, Menu } from 'lucide-react';
 import { useState } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 export function DashboardLayout() {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const links = [
     { to: '/dashboard', label: 'Resumen' },
@@ -65,7 +66,13 @@ export function DashboardLayout() {
             <strong>Bienvenido: {user?.first_name ?? user?.full_name}</strong>
             <span className="muted"> · Cargo: {user?.roles.join(', ')}</span>
           </span>
-          <button className="button secondary" onClick={() => void logout()}>
+          <button
+            className="button secondary"
+            onClick={async () => {
+              await logout();
+              navigate('/login', { replace: true });
+            }}
+          >
             <LogOut size={16} aria-hidden="true" /> Salir
           </button>
         </header>
