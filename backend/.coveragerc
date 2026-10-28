@@ -1,0 +1,14 @@
+[run]
+branch = True
+source = app
+
+[report]
+fail_under = 85
+show_missing = True
+exclude_lines =
+    pragma: no cover
+    if TYPE_CHECKING
+    raise NotImplementedError
+
+[html]
+directory = htmlcov
