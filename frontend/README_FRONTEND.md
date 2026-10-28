@@ -19,7 +19,51 @@ La aplicación usa el puerto estricto `3000`: `http://localhost:3000`.
 - `npm run preview`: sirve la compilación.
 - `npm run lint`: ESLint.
 - `npm run typecheck`: TypeScript estricto.
-- `npm run test`: Vitest y React Testing Library.
+- `npm run test`: Vitest en modo watch.
+- `npm run test:run`: ejecución única para CI.
+- `npm run test:coverage`: ejecución con cobertura V8.
+- `npm run test:ui`: interfaz gráfica de Vitest.
+
+## Estrategia de pruebas frontend
+
+Las pruebas siguen la pirámide de comportamiento y consultan la interfaz como lo haría una persona:
+
+```text
+src/tests/
+	setup/       # matchers globales de jest-dom
+	unit/        # render inicial, contratos visibles y estados aislados
+	interaction/ # userEvent: escritura, teclado, selección y submit
+	functional/  # cambios de UI, estados vacíos y rerenderizados
+	fixtures/    # datos deterministas que simulan respuestas del servidor
+```
+
+`src/tests/setup/setup.ts` se carga desde `vite.config.ts` y registra `jest-dom`. Las pruebas usan `screen` y prefieren `getByRole`, `getByLabelText` y `getByText`; no dependen de clases CSS, `querySelector` ni estado privado. Los nombres se leen como historias de usuario y cada caso sigue Arrange, Act, Assert.
+
+En este dominio no existen componentes `TaskForm` ni `TaskList`. Sus equivalentes reales son `UserCreateForm`/`EnrollmentCreateForm` y `DataTable`: los tests cubren validación de formularios, limpieza conceptual del flujo mediante callbacks, estado ocupado, navegación por teclado, selección, eliminación de filas mediante rerender y estado vacío sin inventar una feature de tareas.
+
+### Mocking
+
+- `vi.fn().mockResolvedValue(undefined)` simula callbacks async como `onSubmit` y permite verificar el contrato observable sin red.
+- `vi.mock()` debe reservarse para módulos externos o servicios HTTP completos, por ejemplo `usersService.lookup`, cuando el componente no debe hacer una llamada real.
+- Las fixtures contienen datos estables; no se usan tiempos, IDs aleatorios ni servidores reales en estas pruebas de componentes.
+
+### Comandos de calidad
+
+```powershell
+npm run test:run
+npm run test:coverage
+npm run typecheck
+npm run lint
+```
+
+La cobertura orienta la búsqueda de huecos, no reemplaza escenarios de usuario. Se debe cubrir comportamiento observable y riesgos del negocio; no cada rama trivial, clase CSS o detalle de implementación.
+
+### Prompts útiles para estudiantes
+
+- `Revisa estos tests React y propón tres escenarios de usuario que falten. Usa roles accesibles y no consultes clases CSS.`
+- `Analiza el reporte de cobertura y relaciona cada línea sin cubrir con un comportamiento observable; no añadas tests de implementación.`
+- `Simplifica este test largo extrayendo una factory de render, manteniendo Arrange-Act-Assert y aislamiento entre casos.`
+- `Detecta duplicación entre estos tests de formularios y propone una fixture tipada sin ocultar las acciones del usuario.`
 
 ## Arquitectura
 
