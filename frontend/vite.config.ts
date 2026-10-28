@@ -7,7 +7,21 @@ export default defineConfig({
   preview: { port: 3000, strictPort: true },
   test: {
     environment: 'jsdom',
-    setupFiles: './src/test-setup.ts',
+    setupFiles: './src/tests/setup/setup.ts',
     globals: true,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html', 'lcov'],
+      exclude: [
+        'src/tests/**',
+        'src/test-setup.ts',
+        'src/main.tsx',
+        'src/**/*.d.ts',
+        'src/**/types.ts',
+        '**/dist/**',
+        '**/*.config.*',
+        'vite.config.ts',
+      ],
+    },
   },
 });

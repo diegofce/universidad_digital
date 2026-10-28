@@ -23,10 +23,12 @@ coverage.xml
 *.sqlite
 *.sqlite3
 
+
 # Frontend
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
+frontend/coverage/
 
 # Builds y logs
 dist/
@@ -46,4 +48,3 @@ Thumbs.db
 # Entorno virtual
 .venv/
 venv/
-
