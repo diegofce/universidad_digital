@@ -1,0 +1,14 @@
+{
+  "id": 9001,
+  "email": "qa-admin@example.test",
+  "full_name": "Administrador de integración",
+  "is_active": true,
+  "created_at": "2026-01-01T00:00:00Z",
+  "roles": ["administrator"],
+  "permissions": ["subjects.manage"],
+  "first_name": "Administrador",
+  "last_name": "QA",
+  "identification_number": "QA-ADMIN-001",
+  "birth_date": "1990-01-01",
+  "phone": "+573001112233"
+}
