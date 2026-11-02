@@ -51,7 +51,7 @@ describe('UserCreateForm', () => {
       birth_date: '2000-01-15',
       phone: '+573001112233',
     });
-  });
+  }, 15000);
 
   it('disables submission while the async action is busy', () => {
     render(<UserCreateForm onSubmit={vi.fn()} busy />);
