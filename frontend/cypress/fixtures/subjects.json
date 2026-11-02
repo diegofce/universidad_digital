@@ -1,0 +1,8 @@
+{
+  "valid": {
+    "code": "QA-CY-001",
+    "name": "Materia Cypress E2E",
+    "description": "Registro creado por pruebas automatizadas",
+    "credits": 3
+  }
+}

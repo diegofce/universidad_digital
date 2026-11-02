@@ -91,6 +91,7 @@ def seeded_roles(db_session: Session) -> dict[str, Role]:
             "enrollments.manage",
             "grades.manage",
             "users.manage",
+            "roles.manage",
         )
     }
     roles = {
@@ -129,6 +130,28 @@ def valid_user(db_session: Session, seeded_roles: dict[str, Role]) -> User:
     db_session.commit()
     db_session.refresh(user)
     return user
+
+
+@pytest.fixture()
+def admin_api_client(api_client: TestClient, db_session: Session, seeded_roles):
+    """Authenticate an administrator against the isolated API database."""
+    user = User(
+        email="admin-test@example.com",
+        full_name="QA Administrator",
+        password_hash=hash_password("admin-test-password-123"),
+        roles=[UserRole(role=seeded_roles["administrator"])],
+    )
+    db_session.add(user)
+    db_session.commit()
+    admin_client = TestClient(app, base_url="http://localhost")
+    response = admin_client.post(
+        "/api/v1/auth/login",
+        json={"email": user.email, "password": "admin-test-password-123"},
+    )
+    assert response.status_code == 200, response.text
+    csrf_token = admin_client.cookies.get("csrf_token")
+    assert csrf_token
+    return admin_client, user, {"X-CSRF-Token": csrf_token}
 
 
 @pytest.fixture()

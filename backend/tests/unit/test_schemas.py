@@ -6,7 +6,7 @@ from decimal import Decimal
 import pytest
 from app.enrollments.schemas import PeriodCreate
 from app.grades.schemas import GradeCreate
-from app.subjects.schemas import SubjectCreate
+from app.subjects.schemas import SubjectCreate, SubjectUpdate
 from app.users.schemas import UserCreate
 from pydantic import ValidationError
 
@@ -46,3 +46,9 @@ def test_period_requires_end_after_start() -> None:
         PeriodCreate(
             name="Invalid", starts_on=date(2026, 6, 1), ends_on=date(2026, 6, 1)
         )
+
+
+@pytest.mark.unit
+def test_subject_update_rejects_explicit_null_active_state() -> None:
+    with pytest.raises(ValidationError, match="is_active cannot be null"):
+        SubjectUpdate(is_active=None)

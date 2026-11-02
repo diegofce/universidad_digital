@@ -26,14 +26,14 @@ python -m pytest
 python -m pytest -m unit
 python -m pytest -m integration
 python -m pytest -m e2e
-python -m pytest --cov=app --cov-report=term-missing --cov-report=html --cov-fail-under=85
+python -m pytest --cov=app --cov-branch --cov-report=term-missing --cov-report=html --cov-fail-under=90
 ```
 
 El E2E PostgreSQL existente solo se ejecuta con `RUN_POSTGRES_E2E=1` y una base configurada. La suite normal nunca modifica esa base.
 
 ## Cobertura y alcance
 
-El objetivo de CI es como mínimo 85% de cobertura de `app`. Se cubren reglas de validación, autenticación, permisos, CSRF, persistencia, límites académicos, cálculo ponderado y contratos HTTP. No se cuenta como cobertura de negocio el código generado por migraciones, arranque de infraestructura o integraciones externas que no existen todavía.
+El objetivo de CI es como mínimo 90% de cobertura de `app`, incluyendo ramas. Se cubren reglas de validación, autenticación, permisos, CSRF, persistencia, límites académicos, cálculo ponderado y contratos HTTP. No se cuenta como cobertura de negocio el código generado por migraciones, arranque de infraestructura o integraciones externas que no existen todavía.
 
 El repositorio actual no implementa pagos, reportes, certificados ni un endpoint público de registro. Por eso no se inventan pruebas para esos flujos: deben añadirse junto con sus módulos y contratos. El flujo de alta disponible se prueba mediante la factory/servicio de usuarios y luego se valida login, matrícula y calificación por las capas correspondientes.
 
