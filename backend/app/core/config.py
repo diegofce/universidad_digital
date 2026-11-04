@@ -30,11 +30,15 @@ class Settings(BaseSettings):
     )
     cookie_secure: bool = Field(
         default=False,
-        validation_alias=AliasChoices("APP_COOKIE_SECURE", "COOKIE_SECURE"),
+        validation_alias=AliasChoices(
+            "APP_COOKIE_SECURE", "COOKIE_SECURE", "cookie_secure"
+        ),
     )
     cors_origins: str = Field(
         default="",
-        validation_alias=AliasChoices("APP_CORS_ORIGINS", "CORS_ORIGINS"),
+        validation_alias=AliasChoices(
+            "APP_CORS_ORIGINS", "CORS_ORIGINS", "cors_origins"
+        ),
     )
     allowed_hosts: str = "*"
     max_credits_per_period: int = Field(default=30, gt=0, le=60)
@@ -43,6 +47,7 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,
+        populate_by_name=True,
     )
 
     @model_validator(mode="after")

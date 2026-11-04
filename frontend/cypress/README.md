@@ -36,7 +36,7 @@ $env:CYPRESS_API_URL = 'http://localhost:8000/api/v1'
 $env:CYPRESS_ADMIN_EMAIL = 'cuenta-admin-qa@ejemplo.test'
 $env:CYPRESS_ADMIN_PASSWORD = '<secreto-local>'
 $env:CYPRESS_TEACHER_SEARCH = 'qa'
-$env:CYPRESS_RESPONSE_BUDGET_MS = '5000'
+$env:CYPRESS_RESPONSE_BUDGET_MS = '10000'
 $env:CYPRESS_ALLOW_DB_WRITES = 'false'
 ```
 

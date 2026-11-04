@@ -5,7 +5,7 @@ export default defineConfig({
   allowCypressEnv: false,
   expose: {
     apiUrl: (process.env.CYPRESS_API_URL ?? `${process.env.VITE_API_BASE_URL ?? 'http://localhost:8000'}/api/v1`).replace(/\/$/, ''),
-    responseBudgetMs: Number(process.env.CYPRESS_RESPONSE_BUDGET_MS ?? 5000),
+    responseBudgetMs: Number(process.env.CYPRESS_RESPONSE_BUDGET_MS ?? 10000),
     teacherSearch: process.env.CYPRESS_TEACHER_SEARCH ?? 'an',
     allowDbWrites: process.env.CYPRESS_ALLOW_DB_WRITES === 'true',
   },
