@@ -51,6 +51,19 @@ def login(data: LoginRequest, response: Response, db: Db) -> User:
 
 @router.post("/logout", status_code=204)
 def logout(response: Response) -> Response:
-    response.delete_cookie("access_token", path="/")
-    response.delete_cookie("csrf_token", path="/")
-    return Response(status_code=204)
+    response.delete_cookie(
+        "access_token",
+        path="/",
+        httponly=True,
+        secure=settings.cookie_secure,
+        samesite="lax",
+    )
+    response.delete_cookie(
+        "csrf_token",
+        path="/",
+        httponly=False,
+        secure=settings.cookie_secure,
+        samesite="lax",
+    )
+    response.status_code = 204
+    return response

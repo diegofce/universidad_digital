@@ -104,7 +104,17 @@ def update(item_id: int, data: GradeUpdate, db: Db, actor: Staff) -> GradeRespon
 def delete(
     item_id: int,
     db: Db,
-    _: Annotated[User, Depends(require_permissions("grades.manage"))],
+    actor: Staff,
 ) -> Response:
-    services.delete_grade(db, item_id)
+    roles = active_role_names(actor)
+    is_admin = "administrator" in roles
+    is_teacher = "teacher" in roles
+    if not is_admin and not is_teacher:
+        raise AppError("Insufficient permissions", 403)
+    services.delete_grade(
+        db,
+        item_id,
+        teacher_id=actor.id if is_teacher and not is_admin else None,
+        admin=is_admin,
+    )
     return Response(status_code=204)

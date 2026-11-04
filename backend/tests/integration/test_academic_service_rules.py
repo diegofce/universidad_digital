@@ -374,12 +374,8 @@ def test_grade_access_scoping_updates_deletion_and_empty_average(
     ) == Decimal("5.00")
     with pytest.raises(AppError, match="Grade not found"):
         update_grade(db_session, 9999, GradeUpdate(score=Decimal("1.00")), admin=True)
-    database = Mock()
-    with patch("app.grades.services.get_grade", return_value=grade) as get_authorized_grade:
-        delete_grade(database, grade.id)
-    get_authorized_grade.assert_called_once_with(database, grade.id)
-    database.delete.assert_called_once_with(grade)
-    database.commit.assert_called_once_with()
+    delete_grade(db_session, grade.id, teacher_id=teacher.id)
+    assert db_session.get(type(grade), grade.id) is None
 
 
 @pytest.mark.unit
