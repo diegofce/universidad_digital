@@ -116,7 +116,12 @@ def update_grade(
     return item
 
 
-def delete_grade(db: Session, item_id: int) -> None:
+def delete_grade(
+    db: Session,
+    item_id: int,
+    teacher_id: int | None = None,
+    admin: bool = False,
+) -> None:
     """Delete an assessment grade."""
-    db.delete(get_grade(db, item_id))
+    db.delete(get_grade(db, item_id, teacher_id=teacher_id, admin=admin))
     db.commit()

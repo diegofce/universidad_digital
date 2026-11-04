@@ -44,13 +44,6 @@ def test_login_rejects_invalid_credentials(api_client, valid_user):
 
 
 @pytest.mark.integration
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "logout mutates the injected Response but returns a new Response "
-        "without deletion cookies"
-    ),
-)
 def test_logout_clears_authentication_cookies(api_client, valid_user):
     login = api_client.post(
         "/api/v1/auth/login",
@@ -63,4 +56,18 @@ def test_logout_clears_authentication_cookies(api_client, valid_user):
         "/api/v1/auth/logout", headers={"X-CSRF-Token": csrf_token}
     )
     assert logout.status_code == 204
+    set_cookie_headers = logout.headers.get_list("set-cookie")
+    assert len(set_cookie_headers) == 2
+    access_cookie = next(
+        header for header in set_cookie_headers if header.startswith("access_token=")
+    )
+    csrf_cookie = next(
+        header for header in set_cookie_headers if header.startswith("csrf_token=")
+    )
+    for cookie_header in (access_cookie, csrf_cookie):
+        assert "Max-Age=0" in cookie_header
+        assert "Path=/" in cookie_header
+        assert "SameSite=lax" in cookie_header
+    assert "HttpOnly" in access_cookie
+    assert "HttpOnly" not in csrf_cookie
     assert api_client.get("/api/v1/auth/me").status_code == 401
