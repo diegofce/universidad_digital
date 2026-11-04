@@ -1,42 +1,49 @@
-import axios, { AxiosHeaders, type InternalAxiosRequestConfig } from 'axios';
+import axios, { type AxiosAdapter } from 'axios';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { api } from '../../api/client';
 
-type RequestHandler = { fulfilled: (config: InternalAxiosRequestConfig) => InternalAxiosRequestConfig };
-type ResponseHandler = { rejected: (error: unknown) => Promise<never> };
-const requestHandler = (api.interceptors.request as unknown as { handlers: RequestHandler[] }).handlers[0];
-const responseHandler = (api.interceptors.response as unknown as { handlers: ResponseHandler[] }).handlers[0];
-
-function request(method: string, url: string) {
-  return { method, url, headers: new AxiosHeaders() } as InternalAxiosRequestConfig;
-}
-
 describe('API client security behavior', () => {
-  afterEach(() => { document.cookie = 'csrf_token=; expires=Thu, 01 Jan 1970 00:00:00 GMT'; });
+  const originalAdapter = api.defaults.adapter;
 
-  it('adds the CSRF cookie to state-changing requests and skips login', () => {
-    document.cookie = 'csrf_token=csrf-value';
-    const update = requestHandler.fulfilled(request('post', '/users/'));
-    expect(update.headers.get('X-CSRF-Token')).toBe('csrf-value');
-    const login = requestHandler.fulfilled(request('post', '/auth/login'));
-    expect(login.headers.get('X-CSRF-Token')).toBeUndefined();
-    const read = requestHandler.fulfilled(request('get', '/users/'));
-    expect(read.headers.get('X-CSRF-Token')).toBeUndefined();
+  afterEach(() => {
+    api.defaults.adapter = originalAdapter;
     document.cookie = 'csrf_token=; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-    const withoutCookie = requestHandler.fulfilled(request('post', '/users/'));
-    expect(withoutCookie.headers.get('X-CSRF-Token')).toBeUndefined();
+  });
+
+  it('adds the CSRF cookie to state-changing requests and skips login', async () => {
+    document.cookie = 'csrf_token=csrf-value';
+    const requests: string[] = [];
+    api.defaults.adapter = vi.fn<AxiosAdapter>(async (config) => {
+      requests.push(`${config.method}:${config.url}:${config.headers.get('X-CSRF-Token') ?? ''}`);
+      return { data: {}, status: 200, statusText: 'OK', headers: {}, config };
+    });
+
+    await api.post('/users/');
+    await api.post('/auth/login');
+    await api.get('/users/');
+    document.cookie = 'csrf_token=; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    await api.post('/users/');
+
+    expect(requests).toEqual([
+      'post:/users/:csrf-value',
+      'post:/auth/login:',
+      'get:/users/:',
+      'post:/users/:',
+    ]);
   });
 
   it('notifies the session context after protected API responses expire', async () => {
     const expired = vi.fn();
     window.addEventListener('auth:expired', expired);
-    const error = new axios.AxiosError('Unauthorized', 'ERR_BAD_REQUEST');
-    Object.assign(error, { config: { url: '/api/v1/subjects/' }, response: { status: 401 } });
-    await expect(responseHandler.rejected(error)).rejects.toBe(error);
+    api.defaults.adapter = vi.fn<AxiosAdapter>(async (config) => {
+      const error = new axios.AxiosError('Unauthorized', 'ERR_BAD_REQUEST', config);
+      Object.assign(error, { response: { status: 401, config } });
+      throw error;
+    });
+
+    await expect(api.get('/subjects/')).rejects.toMatchObject({ response: { status: 401 } });
     expect(expired).toHaveBeenCalledOnce();
-    const currentSession = new axios.AxiosError('Unauthorized', 'ERR_BAD_REQUEST');
-    Object.assign(currentSession, { config: { url: '/api/v1/auth/me' }, response: { status: 401 } });
-    await expect(responseHandler.rejected(currentSession)).rejects.toBe(currentSession);
+    await expect(api.get('/auth/me')).rejects.toMatchObject({ response: { status: 401 } });
     expect(expired).toHaveBeenCalledOnce();
     window.removeEventListener('auth:expired', expired);
   });

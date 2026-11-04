@@ -52,7 +52,7 @@ describe('E2E real: materias y PostgreSQL QA', () => {
       cy.contains('label', 'Código').parent().find('input').type(subject.code);
       cy.contains('label', 'Nombre').parent().find('input').type(subject.name);
       cy.contains('label', 'Descripción').parent().find('input').type(subject.description);
-      cy.contains('label', 'Créditos').parent().find('input').clear().type(String(subject.credits));
+      cy.contains('label', 'Créditos').parent().find('input').click().type('{selectall}').type(String(subject.credits)).blur();
 
       cy.intercept('GET', '**/api/v1/users/lookup?*').as('teacherLookup');
       const teacherSearch = Cypress.expose('teacherSearch') as string;
@@ -70,6 +70,8 @@ describe('E2E real: materias y PostgreSQL QA', () => {
       cy.contains('button', 'Guardar').click();
       cy.assertApiResponse('@createSubject', 201).then(({ request, response }) => {
         if (typeof response?.body?.id === 'number') createdSubjectId = response.body.id;
+        expect(request.url).to.match(/\/api\/v1\/subjects\/$/);
+        expect(request.body.credits).to.eq(subject.credits);
         expect(request.body).to.include(subject);
         expect(request.body.teacher_id).to.be.a('number').and.greaterThan(0);
         expect(response?.body).to.include({ ...subject, is_active: true });
